@@ -9,12 +9,14 @@ import { PetCharacter } from '../PetCharacter/PetCharacter';
 import { WidgetControls } from '../WidgetControls/WidgetControls';
 import { useDraggable } from '../../hooks/useDraggable';
 import { useResizable } from '../../hooks/useResizable';
+import { useDebouncedStorageFlush } from '../../hooks/useDebouncedStorageFlush';
 import styles from './PetWidget.module.scss';
 
 export function PetWidget({ petState }: { petState: UserPetState }) {
   const [widget, setWidget] = useState<WidgetState>(defaultWidgetState());
-  useEffect(() => { void loadWidgetState().then(setWidget); }, []);
-  const updateWidget = useCallback((next: WidgetState) => { setWidget(next); void saveWidgetState(next); }, []);
+  const { scheduleFlush: scheduleWidgetFlush } = useDebouncedStorageFlush<WidgetState>(saveWidgetState, 1000);
+  useEffect(() => { void loadWidgetState().then((state) => { console.log('[Typetchi] storage loaded'); setWidget(state); }); }, []);
+  const updateWidget = useCallback((next: WidgetState) => { setWidget(next); scheduleWidgetFlush(next); }, [scheduleWidgetFlush]);
   const drag = useDraggable(widget, updateWidget);
   const resize = useResizable(widget, updateWidget);
   const stage = getStage(petState.currentStage);

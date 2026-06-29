@@ -5,7 +5,6 @@ import { clamp } from '../utils/clamp';
 export function useResizable(widget: WidgetState, onChange: (next: WidgetState) => void) {
   const startRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   return useCallback((event: React.PointerEvent<HTMLElement>) => {
-    event.stopPropagation();
     if (widget.pinned) return;
     startRef.current = { x: event.clientX, y: event.clientY, width: widget.width, height: widget.height };
     const onMove = (moveEvent: PointerEvent) => {

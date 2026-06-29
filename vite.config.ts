@@ -20,7 +20,7 @@ export default defineConfig({
         serviceWorker: resolve(__dirname, 'src/background/service-worker.ts'),
       },
       output: {
-        entryFileNames: (chunk) => chunk.name === 'serviceWorker' ? 'background/service-worker.js' : 'content/index.js',
+        entryFileNames: (chunk: { name: string }) => chunk.name === 'serviceWorker' ? 'background/service-worker.js' : 'content/index.js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
       },

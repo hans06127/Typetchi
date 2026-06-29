@@ -3,11 +3,11 @@ import type { UserPetState } from '../types/pet';
 import { getLocalDateKey } from '../utils/date';
 import { calculateLevel } from '../systems/expSystem';
 import { calculateStage } from '../systems/evolutionSystem';
-import { getStoredValue, setStoredValue } from './chromeStorage';
+import { getStorageValue, setStorageValue } from './extensionStorage';
 import { STORAGE_KEYS } from './storageKeys';
 
 export async function loadPetState(): Promise<UserPetState> {
-  const state = await getStoredValue(STORAGE_KEYS.pet, defaultPetState());
+  const state = await getStorageValue(STORAGE_KEYS.pet, defaultPetState());
   const today = getLocalDateKey();
   return {
     ...state,
@@ -17,4 +17,4 @@ export async function loadPetState(): Promise<UserPetState> {
     lastActiveDate: today,
   };
 }
-export const savePetState = (state: UserPetState) => setStoredValue(STORAGE_KEYS.pet, state);
+export const savePetState = (state: UserPetState) => setStorageValue(STORAGE_KEYS.pet, state);
