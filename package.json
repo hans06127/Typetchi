@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build",
+    "dev": "node scripts/build-dist.mjs --watch",
+    "build": "node scripts/build-dist.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
