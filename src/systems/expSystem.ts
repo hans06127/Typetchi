@@ -1,0 +1,10 @@
+import type { UserPetState } from '../types/pet';
+import { calculateStage } from './evolutionSystem';
+
+export function calculateExpFromTyping(addedChars: number): number { return Math.max(0, addedChars); }
+export function calculateLevel(totalExp: number): number { return Math.floor(totalExp / 100) + 1; }
+export function applyTypingExp(state: UserPetState, addedChars: number): UserPetState {
+  const gainedExp = calculateExpFromTyping(addedChars);
+  const nextTotalExp = state.totalExp + gainedExp;
+  return { ...state, totalExp: nextTotalExp, level: calculateLevel(nextTotalExp), currentStage: calculateStage(nextTotalExp), todayTypedCount: state.todayTypedCount + addedChars };
+}
