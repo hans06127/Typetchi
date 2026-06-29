@@ -25,6 +25,7 @@
   let isMounting = false;
   let ensureRootTimer;
   let rootRemovalObserver;
+  let hasLoggedStorageInvalidation = false;
 
   function dateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -38,16 +39,50 @@
   function defaultWidgetState() {
     return { x: Math.max(16, window.innerWidth - 300), y: Math.max(16, window.innerHeight - 380), width: 280, height: 360, pinned: false, collapsed: false, closed: false };
   }
+  function isExtensionContextInvalidated(error) {
+    return error instanceof Error && error.message.includes('Extension context invalidated');
+  }
+  function warnStorageUnavailable(error) {
+    if (hasLoggedStorageInvalidation) return;
+    hasLoggedStorageInvalidation = true;
+    if (isExtensionContextInvalidated(error)) {
+      console.warn('[Typetchi] extension context invalidated, skipping storage access until reload');
+      return;
+    }
+    console.warn('[Typetchi] storage unavailable, using in-memory state', error);
+  }
   function storageGet(key, fallback) {
     return new Promise((resolve) => {
       if (!globalThis.chrome?.storage?.local) return resolve(fallback);
-      chrome.storage.local.get(key, (result) => resolve(result[key] ?? fallback));
+      try {
+        chrome.storage.local.get(key, (result) => {
+          const error = chrome.runtime?.lastError;
+          if (error) {
+            warnStorageUnavailable(error);
+            resolve(fallback);
+            return;
+          }
+          resolve(result[key] ?? fallback);
+        });
+      } catch (error) {
+        warnStorageUnavailable(error);
+        resolve(fallback);
+      }
     });
   }
   function storageSet(key, value) {
     return new Promise((resolve) => {
       if (!globalThis.chrome?.storage?.local) return resolve();
-      chrome.storage.local.set({ [key]: value }, resolve);
+      try {
+        chrome.storage.local.set({ [key]: value }, () => {
+          const error = chrome.runtime?.lastError;
+          if (error) warnStorageUnavailable(error);
+          resolve();
+        });
+      } catch (error) {
+        warnStorageUnavailable(error);
+        resolve();
+      }
     });
   }
   function flushPetState() {
