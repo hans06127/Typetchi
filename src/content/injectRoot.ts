@@ -11,13 +11,13 @@ function getMountParent(): HTMLElement {
 
 function applyRootIsolationStyles(root: HTMLElement): void {
   root.style.position = 'fixed';
-  root.style.right = '24px';
-  root.style.bottom = '24px';
+  root.style.inset = '0';
   root.style.zIndex = '2147483647';
-  root.style.width = '280px';
-  root.style.height = '360px';
+  root.style.width = '0';
+  root.style.height = '0';
   root.style.pointerEvents = 'none';
-  root.style.contain = 'layout style paint';
+  root.style.overflow = 'visible';
+  root.style.contain = 'layout style';
 }
 
 export function injectTypetchiRoot(): HTMLElement | null {

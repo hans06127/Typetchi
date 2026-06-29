@@ -25,7 +25,8 @@
   let isMounting = false;
   let ensureRootTimer;
   let rootRemovalObserver;
-  let hasLoggedStorageInvalidation = false;
+  let hasLoggedStorageUnavailable = false;
+  let isStorageDisabled = false;
 
   function dateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -43,44 +44,79 @@
     return error instanceof Error && error.message.includes('Extension context invalidated');
   }
   function warnStorageUnavailable(error) {
-    if (hasLoggedStorageInvalidation) return;
-    hasLoggedStorageInvalidation = true;
+    if (hasLoggedStorageUnavailable) return;
+    hasLoggedStorageUnavailable = true;
     if (isExtensionContextInvalidated(error)) {
-      console.warn('[Typetchi] extension context invalidated, skipping storage access until reload');
+      console.warn('[Typetchi] extension context invalidated; storage is disabled until the page reloads');
       return;
     }
     console.warn('[Typetchi] storage unavailable, using in-memory state', error);
   }
+  function disableStorage(error) {
+    isStorageDisabled = true;
+    warnStorageUnavailable(error);
+  }
+  function getChromeLocalStorage() {
+    if (isStorageDisabled) return null;
+    try {
+      return globalThis.chrome?.storage?.local ?? null;
+    } catch (error) {
+      disableStorage(error);
+      return null;
+    }
+  }
+
+  function numberOrFallback(value, fallback) {
+    return Number.isFinite(value) ? value : fallback;
+  }
+  function normalizeWidgetState(state) {
+    const defaults = defaultWidgetState();
+    const widthMax = Math.max(220, Math.min(420, window.innerWidth - 16));
+    const heightMax = Math.max(180, Math.min(560, window.innerHeight - 16));
+    const width = clamp(numberOrFallback(state?.width, defaults.width), 220, widthMax);
+    const height = clamp(numberOrFallback(state?.height, defaults.height), 180, heightMax);
+    return {
+      ...defaults,
+      ...(state ?? {}),
+      x: clamp(numberOrFallback(state?.x, defaults.x), 8, Math.max(8, window.innerWidth - width - 8)),
+      y: clamp(numberOrFallback(state?.y, defaults.y), 8, Math.max(8, window.innerHeight - height - 8)),
+      width,
+      height,
+      closed: false,
+    };
+  }
   function storageGet(key, fallback) {
     return new Promise((resolve) => {
-      if (!globalThis.chrome?.storage?.local) return resolve(fallback);
+      const localStorage = getChromeLocalStorage();
+      if (!localStorage) return resolve(fallback);
       try {
-        chrome.storage.local.get(key, (result) => {
+        localStorage.get(key, (result) => {
           const error = chrome.runtime?.lastError;
           if (error) {
-            warnStorageUnavailable(error);
+            disableStorage(error);
             resolve(fallback);
             return;
           }
           resolve(result[key] ?? fallback);
         });
       } catch (error) {
-        warnStorageUnavailable(error);
+        disableStorage(error);
         resolve(fallback);
       }
     });
   }
   function storageSet(key, value) {
     return new Promise((resolve) => {
-      if (!globalThis.chrome?.storage?.local) return resolve();
+      const localStorage = getChromeLocalStorage();
+      if (!localStorage) return resolve();
       try {
-        chrome.storage.local.set({ [key]: value }, () => {
+        localStorage.set({ [key]: value }, () => {
           const error = chrome.runtime?.lastError;
-          if (error) warnStorageUnavailable(error);
+          if (error) disableStorage(error);
           resolve();
         });
       } catch (error) {
-        warnStorageUnavailable(error);
+        disableStorage(error);
         resolve();
       }
     });
@@ -156,13 +192,13 @@
   }
   function applyRootStyles(root) {
     root.style.position = 'fixed';
-    root.style.right = '24px';
-    root.style.bottom = '24px';
+    root.style.inset = '0';
     root.style.zIndex = '2147483647';
-    root.style.width = '280px';
-    root.style.height = '360px';
+    root.style.width = '0';
+    root.style.height = '0';
     root.style.pointerEvents = 'none';
-    root.style.contain = 'layout style paint';
+    root.style.overflow = 'visible';
+    root.style.contain = 'layout style';
   }
   function injectTypetchiRoot() {
     const existingRoot = document.getElementById(ROOT_ID);
@@ -252,7 +288,7 @@
       createButton(widgetState.pinned ? '解除固定' : '固定', () => setWidget({ ...widgetState, pinned: !widgetState.pinned })),
       createButton(widgetState.collapsed ? '展開' : '收合', toggleCollapse),
       createButton('重置', () => setWidget(defaultWidgetState())),
-      createButton('關閉', () => setWidget({ ...widgetState, closed: true })),
+      createButton('關閉', () => { widgetState = { ...widgetState, closed: true }; render(); }),
     );
     header.append(title, controls);
 
@@ -365,7 +401,7 @@
     Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState())]).then(([storedPet, storedWidget]) => {
       const today = dateKey();
       petState = { ...storedPet, level: calculateLevel(storedPet.totalExp), currentStage: calculateStage(storedPet.totalExp), todayTypedCount: storedPet.lastActiveDate === today ? storedPet.todayTypedCount : 0, lastActiveDate: today };
-      widgetState = { ...defaultWidgetState(), ...storedWidget };
+      widgetState = normalizeWidgetState(storedWidget);
       console.log('[Typetchi] storage loaded');
       schedulePetFlush(petState);
       render();
