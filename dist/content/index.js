@@ -4,6 +4,9 @@
   const PET_KEY = 'typetchi.petState';
   const WIDGET_KEY = 'typetchi.widgetState';
   const FLUSH_DELAY_MS = 1000;
+  const PET_ANIMATION_DURATION = { typing: 400, happy: 800, level_up: 1200, evolve: 1800 };
+  const PET_MESSAGES = { typing: ['正在吸收文字能量...', '今天也很努力呢', '繼續打字，我會長大！'], levelUp: ['升級了！', '變得更有精神了！'], evolve: ['進化了！', '新的樣子登場！'] };
+  const TYPING_MESSAGE_COOLDOWN_MS = 30000;
   const STAGES = [
     { id: 'stage_1', name: '幼年期', requiredExp: 0, icon: '🌱' },
     { id: 'stage_2', name: '成長期', requiredExp: 500, icon: '🌿' },
@@ -27,6 +30,13 @@
   let rootRemovalObserver;
   let hasLoggedStorageUnavailable = false;
   let isStorageDisabled = false;
+  let animationState = 'idle';
+  let animationTimer;
+  let expToast = { amount: 0, visible: false };
+  let expToastTimer;
+  let speechBubble = { message: null, visible: false };
+  let speechBubbleTimer;
+  let lastTypingMessageAt = 0;
 
   function dateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -165,6 +175,39 @@
   function getNextStage(totalExp) {
     return STAGES.find((stage) => stage.requiredExp > totalExp);
   }
+  function calculateStageProgress(totalExp) {
+    if (totalExp < 500) return { current: totalExp, required: 500, percentage: Math.min((totalExp / 500) * 100, 100), isMaxStage: false };
+    if (totalExp < 2000) { const current = totalExp - 500; return { current, required: 1500, percentage: Math.min((current / 1500) * 100, 100), isMaxStage: false }; }
+    return { current: 2000, required: 2000, percentage: 100, isMaxStage: true };
+  }
+  function playAnimation(nextState) {
+    const priority = { idle: 0, typing: 1, happy: 2, level_up: 3, evolve: 4 };
+    if (priority[nextState] < priority[animationState]) return;
+    window.clearTimeout(animationTimer);
+    animationState = nextState;
+    render();
+    animationTimer = window.setTimeout(() => { animationState = 'idle'; render(); }, PET_ANIMATION_DURATION[nextState] ?? 0);
+  }
+  function showExpToast(amount) {
+    if (amount <= 0) return;
+    window.clearTimeout(expToastTimer);
+    expToast = { amount, visible: true };
+    render();
+    expToastTimer = window.setTimeout(() => { expToast = { ...expToast, visible: false }; render(); }, 1000);
+  }
+  function pickMessage(kind) {
+    const messages = PET_MESSAGES[kind];
+    return messages[Math.floor(Math.random() * messages.length)] ?? '';
+  }
+  function showSpeech(kind, force = false) {
+    const now = Date.now();
+    if (kind === 'typing' && !force && now - lastTypingMessageAt < TYPING_MESSAGE_COOLDOWN_MS) return;
+    if (kind === 'typing') lastTypingMessageAt = now;
+    window.clearTimeout(speechBubbleTimer);
+    speechBubble = { message: pickMessage(kind), visible: true };
+    render();
+    speechBubbleTimer = window.setTimeout(() => { speechBubble = { ...speechBubble, visible: false }; render(); }, 2600);
+  }
   function isTrackableInput(target) {
     if (!(target instanceof HTMLElement)) return false;
     if (target instanceof HTMLInputElement) {
@@ -225,11 +268,18 @@
       .typetchi-controls { display: flex; gap: 6px; }
       button { border: 0; border-radius: 999px; background: rgba(255,255,255,.72); color: #6b5a52; cursor: pointer; font-size: 12px; padding: 5px 8px; pointer-events: auto; }
       button:hover { background: white; }
-      .typetchi-body { padding: 14px 16px 18px; display: grid; gap: 12px; }
-      .typetchi-stage { display: grid; place-items: center; min-height: 112px; }
-      .typetchi-pet { width: 96px; height: 96px; border-radius: 48% 52% 45% 55%; display: grid; place-items: center; font-size: 42px; box-shadow: inset -10px -14px 22px rgba(116,80,70,.12); animation: typetchi-float 2.8s ease-in-out infinite; }
-      .stage_1 { background: #ffd7df; } .stage_2 { background: #c7f2dd; transform: scale(1.08); } .stage_3 { background: #d8d0ff; transform: scale(1.16); }
+      .typetchi-body { padding: 10px 16px 18px; display: grid; gap: 8px; }
+      .typetchi-stage { display: grid; place-items: center; min-height: 104px; }
+      .typetchi-pet { position: relative; width: 82px; height: 82px; transform-origin: center bottom; }
+      .typetchi-pet-body { position: absolute; inset: 10px; border-radius: 48% 52% 45% 55%; background: linear-gradient(145deg, #ffd6dc, #ffb7c7); box-shadow: inset -8px -10px 18px rgba(173,82,104,.13), 0 12px 24px rgba(153,96,96,.2); }
+      .typetchi-face { position: absolute; left: 28px; right: 28px; top: 39px; display: flex; justify-content: space-between; } .typetchi-eye { width: 7px; height: 9px; border-radius: 999px; background: #58423c; }
+      .stage_1 .typetchi-pet-body { background: linear-gradient(145deg, #d8f6c5, #aee7bc); } .stage_2 .typetchi-pet-body { background: linear-gradient(145deg, #c7f0ff, #9bd8ff); } .stage_3 .typetchi-pet-body { background: linear-gradient(145deg, #ffe3a8, #ffb9c9); }
+      .typetchi-ear { position: absolute; top: 6px; width: 20px; height: 28px; border-radius: 999px 999px 12px 12px; background: #ffc4d0; z-index: -1; } .typetchi-ear.left { left: 16px; transform: rotate(-24deg); } .typetchi-ear.right { right: 16px; transform: rotate(24deg); }
+      .typetchi-arm { position: absolute; top: 50px; width: 18px; height: 11px; border-radius: 999px; background: #ffc1ca; } .typetchi-arm.left { left: 2px; transform: rotate(-18deg); } .typetchi-arm.right { right: 2px; transform: rotate(18deg); }
       .typetchi-name { margin-top: 8px; color: #6b5a52; font-weight: 700; text-align: center; }
+      .typetchi-bubble { min-height: 18px; justify-self: center; max-width: 100%; padding: 6px 10px; border-radius: 14px; background: rgba(255,255,255,.86); color: #6b5145; font-size: 12px; font-weight: 700; opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; } .typetchi-bubble.visible { opacity: 1; transform: translateY(0); }
+      .typetchi-toast { position: absolute; right: 16px; bottom: 92px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: rgba(255,238,170,.96); color: #765022; font-size: 12px; font-weight: 800; opacity: 0; pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; } .typetchi-toast.visible { opacity: 1; animation: typetchi-exp-toast 1s ease-out; }
+      .typetchi-pet.idle { animation: typetchi-idle 2.4s ease-in-out infinite; } .typetchi-pet.typing { animation: typetchi-typing .4s ease-in-out; } .typetchi-pet.happy { animation: typetchi-happy .8s ease-in-out; } .typetchi-pet.level_up { animation: typetchi-level-up 1.2s ease-in-out; } .typetchi-pet.evolve { animation: typetchi-evolve 1.8s ease-in-out; }
       .typetchi-stats { display: grid; gap: 7px; font-size: 13px; }
       .typetchi-row { display: flex; justify-content: space-between; gap: 12px; }
       .typetchi-muted { color: #8a786e; }
@@ -237,11 +287,12 @@
       .typetchi-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffb7c5, #ffd88a, #9ee7c6); transition: width 220ms ease; }
       .typetchi-resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; pointer-events: auto; }
       .typetchi-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
-      .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); }
-      .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize { visibility: hidden; pointer-events: none; }
-      .typetchi-collapsed .typetchi-header { border-radius: 22px; }
+      .typetchi-handle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); transform: translateX(-50%); box-shadow: 0 8px 22px rgba(91,68,56,.18); pointer-events: auto; } .typetchi-handle:hover::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; } .typetchi-handle .typetchi-pet { width: 32px; height: 32px; }
+      .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
+      .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize { visibility: hidden; pointer-events: none; }
+      .typetchi-collapsed .typetchi-handle { display: flex; visibility: visible; }
       .typetchi-reopen { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; box-shadow: 0 12px 28px rgba(91,68,56,.2); pointer-events: auto; }
-      @keyframes typetchi-float { 0%,100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+      @keyframes typetchi-idle { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } } @keyframes typetchi-typing { 0% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-6px) rotate(-3deg); } 70% { transform: translateY(0) rotate(3deg); } 100% { transform: translateY(0) rotate(0); } } @keyframes typetchi-happy { 0%,100% { transform: scale(1); } 40% { transform: scale(1.12); } 70% { transform: scale(.96); } } @keyframes typetchi-level-up { 0% { transform: scale(1); filter: brightness(1); } 40% { transform: scale(1.18); filter: brightness(1.25); } 100% { transform: scale(1); filter: brightness(1); } } @keyframes typetchi-evolve { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 40% { transform: scale(1.25); opacity: .7; filter: brightness(1.8); } 70% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1); opacity: 1; filter: brightness(1); } } @keyframes typetchi-exp-toast { 0% { transform: translateY(6px) scale(.96); } 35% { transform: translateY(-6px) scale(1.04); } 100% { transform: translateY(-4px) scale(1); } } @media (prefers-reduced-motion: reduce) { .typetchi-widget, .typetchi-pet, .typetchi-fill, .typetchi-toast, .typetchi-bubble { animation: none !important; transition: none !important; } }
     `;
     appRoot = document.createElement('div');
     appRoot.id = APP_ID;
@@ -256,6 +307,17 @@
     button.addEventListener('click', onClick);
     return button;
   }
+  function createPetElement(stageId) {
+    const pet = document.createElement('div');
+    pet.className = `typetchi-pet ${stageId} ${animationState}`;
+    const body = document.createElement('div'); body.className = 'typetchi-pet-body';
+    const face = document.createElement('div'); face.className = 'typetchi-face';
+    const eye1 = document.createElement('span'); eye1.className = 'typetchi-eye'; const eye2 = document.createElement('span'); eye2.className = 'typetchi-eye'; face.append(eye1, eye2);
+    pet.append(body, face);
+    if (stageId !== 'stage_1') { const l = document.createElement('span'); l.className = 'typetchi-ear left'; const r = document.createElement('span'); r.className = 'typetchi-ear right'; pet.append(l, r); }
+    if (stageId === 'stage_3') { const l = document.createElement('span'); l.className = 'typetchi-arm left'; const r = document.createElement('span'); r.className = 'typetchi-arm right'; pet.append(l, r); }
+    return pet;
+  }
   function render() {
     if (!appRoot) return;
     appRoot.replaceChildren();
@@ -266,9 +328,8 @@
     }
     const stage = getStage(petState.totalExp);
     const nextStage = getNextStage(petState.totalExp);
-    const expBase = stage.requiredExp;
-    const expTarget = nextStage?.requiredExp ?? petState.totalExp;
-    const percent = nextStage ? Math.min(100, ((petState.totalExp - expBase) / Math.max(1, expTarget - expBase)) * 100) : 100;
+    const progress = calculateStageProgress(petState.totalExp);
+    const percent = progress.percentage;
 
     const widget = document.createElement('section');
     widget.className = 'typetchi-widget' + (widgetState.collapsed ? ' typetchi-collapsed' : '');
@@ -276,6 +337,14 @@
     widget.style.top = widgetState.y + 'px';
     widget.style.width = widgetState.width + 'px';
     widget.style.height = widgetState.height + 'px';
+
+    const handle = document.createElement('button');
+    handle.type = 'button';
+    handle.className = 'typetchi-handle';
+    handle.title = '展開 Typetchi';
+    handle.setAttribute('aria-label', '展開 Typetchi');
+    handle.addEventListener('click', toggleCollapse);
+    handle.append(createPetElement(stage.id, true));
 
     const header = document.createElement('header');
     header.className = 'typetchi-header';
@@ -294,12 +363,13 @@
 
     const body = document.createElement('div');
     body.className = 'typetchi-body';
+    const bubble = document.createElement('div');
+    bubble.className = 'typetchi-bubble' + (speechBubble.visible && speechBubble.message ? ' visible' : '');
+    bubble.textContent = speechBubble.message ?? '';
     const stageArea = document.createElement('div');
     stageArea.className = 'typetchi-stage';
     const stageWrap = document.createElement('div');
-    const pet = document.createElement('div');
-    pet.className = `typetchi-pet ${stage.id}`;
-    pet.textContent = stage.icon;
+    const pet = createPetElement(stage.id);
     const petName = document.createElement('div');
     petName.className = 'typetchi-name';
     petName.textContent = stage.name;
@@ -327,17 +397,20 @@
     bar.append(fill);
     stats.append(
       makeRow(`Lv. ${petState.level}`, stage.name, false, true),
-      makeRow('EXP', nextStage ? petState.totalExp + ' / ' + nextStage.requiredExp : petState.totalExp + ' / MAX'),
+      makeRow('EXP', progress.isMaxStage ? '最高階段' : progress.current + ' / ' + progress.required),
       bar,
       makeRow('今日輸入', petState.todayTypedCount + ' 字', true),
       makeRow('下一階段', nextStage?.name ?? '已成熟', true),
     );
-    body.append(stageArea, stats);
+    body.append(bubble, stageArea, stats);
     const resize = document.createElement('span');
     resize.className = 'typetchi-resize';
     header.addEventListener('pointerdown', startDrag);
     resize.addEventListener('pointerdown', startResize);
-    widget.append(header, body, resize);
+    const toast = document.createElement('span');
+    toast.className = 'typetchi-toast' + (expToast.visible ? ' visible' : '');
+    toast.textContent = '+' + expToast.amount + ' EXP';
+    widget.append(handle, header, body, toast, resize);
     appRoot.append(widget);
   }
   function setWidget(next) {
@@ -352,8 +425,16 @@
     setWidget({ ...widgetState, collapsed });
   }
   function addTypingExp(addedChars) {
+    const today = dateKey();
+    const todayTypedCount = petState.lastActiveDate === today ? petState.todayTypedCount : 0;
+    const previous = petState;
     const totalExp = petState.totalExp + addedChars;
-    petState = { ...petState, totalExp, level: calculateLevel(totalExp), currentStage: calculateStage(totalExp), todayTypedCount: petState.todayTypedCount + addedChars, lastActiveDate: dateKey() };
+    petState = { ...petState, totalExp, level: calculateLevel(totalExp), currentStage: calculateStage(totalExp), todayTypedCount: todayTypedCount + addedChars, lastActiveDate: today };
+    const evolved = previous.currentStage !== petState.currentStage;
+    const leveledUp = previous.level < petState.level;
+    playAnimation(evolved ? 'evolve' : leveledUp ? 'level_up' : 'happy');
+    showExpToast(addedChars);
+    if (evolved) showSpeech('evolve', true); else if (leveledUp) showSpeech('levelUp', true); else showSpeech('typing');
     schedulePetFlush(petState);
     render();
   }
