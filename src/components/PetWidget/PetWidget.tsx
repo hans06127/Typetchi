@@ -32,7 +32,7 @@ export function PetWidget({ petState }: { petState: UserPetState }) {
   return <section className={`${styles.widget} ${widget.collapsed ? styles.collapsed : ''}`} style={{ left: widget.x, top: widget.y, width: widget.width, height: widget.height, '--typetchi-expanded-height': `${widget.height}px` } as Record<string, string | number>}>
     <header className={styles.header} onPointerDown={drag}>
       <span className={styles.title}>Typetchi</span>
-      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onReset={() => updateWidget(defaultWidgetState())} onClose={() => updateWidget({ ...widget, closed: true })} />
+      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onReset={() => updateWidget(defaultWidgetState())} onClose={() => setWidget({ ...widget, closed: true })} />
     </header>
     <div className={styles.body}>
       <PetCharacter stage={stage} />
