@@ -1,0 +1,4 @@
+.toast { position: absolute; right: 16px; bottom: 92px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: rgba(255, 238, 170, .96); color: #765022; font-size: 12px; font-weight: 800; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; box-shadow: 0 8px 20px rgba(121, 82, 30, .16); }
+.visible { opacity: 1; transform: translateY(-4px); animation: typetchi-exp-toast 1s ease-out; }
+@keyframes typetchi-exp-toast { 0% { transform: translateY(6px) scale(.96); } 35% { transform: translateY(-6px) scale(1.04); } 100% { transform: translateY(-4px) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none !important; transition: none !important; } }

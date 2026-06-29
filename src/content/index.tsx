@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PetWidget } from '../components/PetWidget/PetWidget';
-import { usePetProgress } from '../hooks/usePetProgress';
+import { useExpGainToast } from '../hooks/useExpGainToast';
+import { usePetAnimation } from '../hooks/usePetAnimation';
+import { usePetProgress, type TypingProgressResult } from '../hooks/usePetProgress';
+import { useSpeechBubble } from '../hooks/useSpeechBubble';
 import { useTypingTracker } from '../hooks/useTypingTracker';
 import { hasTypetchiRoot, injectTypetchiRoot, ROOT_ID } from './injectRoot';
 
@@ -10,9 +13,19 @@ let ensureRootTimer: number | undefined;
 let rootRemovalObserver: MutationObserver | undefined;
 
 function App() {
-  const { petState, addTypingExp } = usePetProgress();
+  const animation = usePetAnimation();
+  const expToast = useExpGainToast();
+  const speechBubble = useSpeechBubble();
+  const handleTypingProgress = useCallback((result: TypingProgressResult) => {
+    animation.playAnimation(result.animationState);
+    expToast.showExpGain(result.gainedExp);
+    if (result.evolved) speechBubble.showMessage('evolve', true);
+    else if (result.leveledUp) speechBubble.showMessage('levelUp', true);
+    else speechBubble.showMessage('typing');
+  }, [animation, expToast, speechBubble]);
+  const { petState, addTypingExp } = usePetProgress(handleTypingProgress);
   useTypingTracker(addTypingExp);
-  return <PetWidget petState={petState} />;
+  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} />;
 }
 
 function ensureTypetchiRoot() {
