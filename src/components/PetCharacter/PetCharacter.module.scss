@@ -1,0 +1,7 @@
+.stage { display: grid; place-items: center; min-height: 112px; }
+.pet { width: 96px; height: 96px; border-radius: 48% 52% 45% 55%; display: grid; place-items: center; font-size: 42px; box-shadow: inset -10px -14px 22px rgba(116, 80, 70, .12); animation: float 2.8s ease-in-out infinite; }
+.stage_1 { background: #ffd7df; }
+.stage_2 { background: #c7f2dd; transform: scale(1.08); }
+.stage_3 { background: #d8d0ff; transform: scale(1.16); }
+.name { margin-top: 8px; color: #6b5a52; font-weight: 700; text-align: center; }
+@keyframes float { 0%,100% { translate: 0 0; } 50% { translate: 0 -8px; } }
