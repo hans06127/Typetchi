@@ -1,6 +1,14 @@
 export const ROOT_ID = 'typetchi-root';
 export const APP_ID = 'typetchi-app';
 
+export function hasTypetchiRoot(): boolean {
+  return Boolean(document.getElementById(ROOT_ID));
+}
+
+function getMountParent(): HTMLElement {
+  return document.documentElement;
+}
+
 function applyRootIsolationStyles(root: HTMLElement): void {
   root.style.position = 'fixed';
   root.style.right = '24px';
@@ -15,14 +23,14 @@ function applyRootIsolationStyles(root: HTMLElement): void {
 export function injectTypetchiRoot(): HTMLElement | null {
   const existingRoot = document.getElementById(ROOT_ID);
   if (existingRoot) {
-    console.log('[Typetchi] root already exists, skip injection');
+    console.log('[Typetchi] root already exists, skip mount');
     return null;
   }
 
   const root = document.createElement('div');
   root.id = ROOT_ID;
   applyRootIsolationStyles(root);
-  document.body.appendChild(root);
+  getMountParent().appendChild(root);
   console.log('[Typetchi] root injected');
 
   const shadowRoot = root.attachShadow({ mode: 'open' });
@@ -34,18 +42,4 @@ export function injectTypetchiRoot(): HTMLElement | null {
   shadowRoot.append(app);
 
   return app;
-}
-
-export function mountWhenBodyReady(mount: (rootElement: HTMLElement) => void): void {
-  const mountOnce = () => {
-    console.log('[Typetchi] document body ready');
-    const rootElement = injectTypetchiRoot();
-    if (rootElement) mount(rootElement);
-  };
-
-  if (document.body) {
-    mountOnce();
-  } else {
-    window.addEventListener('DOMContentLoaded', mountOnce, { once: true });
-  }
 }

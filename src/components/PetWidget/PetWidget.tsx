@@ -19,15 +19,20 @@ export function PetWidget({ petState }: { petState: UserPetState }) {
   const updateWidget = useCallback((next: WidgetState) => { setWidget(next); scheduleWidgetFlush(next); }, [scheduleWidgetFlush]);
   const drag = useDraggable(widget, updateWidget);
   const resize = useResizable(widget, updateWidget);
+  const toggleCollapse = useCallback(() => {
+    const collapsed = !widget.collapsed;
+    console.log(collapsed ? '[Typetchi] widget collapsed' : '[Typetchi] widget expanded');
+    updateWidget({ ...widget, collapsed });
+  }, [updateWidget, widget]);
   const stage = getStage(petState.currentStage);
   const nextStage = getNextStage(petState.totalExp);
   const expBase = stage.requiredExp;
   const expTarget = nextStage?.requiredExp ?? petState.totalExp;
   if (widget.closed) return null;
-  return <section className={`${styles.widget} ${widget.collapsed ? styles.collapsed : ''}`} style={{ left: widget.x, top: widget.y, width: widget.width, height: widget.collapsed ? undefined : widget.height }}>
+  return <section className={`${styles.widget} ${widget.collapsed ? styles.collapsed : ''}`} style={{ left: widget.x, top: widget.y, width: widget.width, height: widget.height, '--typetchi-expanded-height': `${widget.height}px` } as Record<string, string | number>}>
     <header className={styles.header} onPointerDown={drag}>
       <span className={styles.title}>Typetchi</span>
-      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={() => updateWidget({ ...widget, collapsed: !widget.collapsed })} onReset={() => updateWidget(defaultWidgetState())} onClose={() => updateWidget({ ...widget, closed: true })} />
+      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onReset={() => updateWidget(defaultWidgetState())} onClose={() => updateWidget({ ...widget, closed: true })} />
     </header>
     <div className={styles.body}>
       <PetCharacter stage={stage} />

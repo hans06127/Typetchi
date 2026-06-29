@@ -22,6 +22,10 @@
   let widgetFlushTimer;
   let pendingPetState = null;
   let pendingWidgetState = null;
+  let isMounting = false;
+  let ensureRootTimer;
+  let rootRemovalObserver;
+  let hasLoggedStorageInvalidation = false;
 
   function dateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -35,16 +39,50 @@
   function defaultWidgetState() {
     return { x: Math.max(16, window.innerWidth - 300), y: Math.max(16, window.innerHeight - 380), width: 280, height: 360, pinned: false, collapsed: false, closed: false };
   }
+  function isExtensionContextInvalidated(error) {
+    return error instanceof Error && error.message.includes('Extension context invalidated');
+  }
+  function warnStorageUnavailable(error) {
+    if (hasLoggedStorageInvalidation) return;
+    hasLoggedStorageInvalidation = true;
+    if (isExtensionContextInvalidated(error)) {
+      console.warn('[Typetchi] extension context invalidated, skipping storage access until reload');
+      return;
+    }
+    console.warn('[Typetchi] storage unavailable, using in-memory state', error);
+  }
   function storageGet(key, fallback) {
     return new Promise((resolve) => {
       if (!globalThis.chrome?.storage?.local) return resolve(fallback);
-      chrome.storage.local.get(key, (result) => resolve(result[key] ?? fallback));
+      try {
+        chrome.storage.local.get(key, (result) => {
+          const error = chrome.runtime?.lastError;
+          if (error) {
+            warnStorageUnavailable(error);
+            resolve(fallback);
+            return;
+          }
+          resolve(result[key] ?? fallback);
+        });
+      } catch (error) {
+        warnStorageUnavailable(error);
+        resolve(fallback);
+      }
     });
   }
   function storageSet(key, value) {
     return new Promise((resolve) => {
       if (!globalThis.chrome?.storage?.local) return resolve();
-      chrome.storage.local.set({ [key]: value }, resolve);
+      try {
+        chrome.storage.local.set({ [key]: value }, () => {
+          const error = chrome.runtime?.lastError;
+          if (error) warnStorageUnavailable(error);
+          resolve();
+        });
+      } catch (error) {
+        warnStorageUnavailable(error);
+        resolve();
+      }
     });
   }
   function flushPetState() {
@@ -110,25 +148,32 @@
     previousLengthMap.set(element, currentLength);
     return Math.max(currentLength - previousLength, 0);
   }
+  function hasTypetchiRoot() {
+    return Boolean(document.getElementById(ROOT_ID));
+  }
+  function getMountParent() {
+    return document.documentElement;
+  }
   function applyRootStyles(root) {
     root.style.position = 'fixed';
-    root.style.inset = '0';
+    root.style.right = '24px';
+    root.style.bottom = '24px';
     root.style.zIndex = '2147483647';
-    root.style.width = '100vw';
-    root.style.height = '100vh';
+    root.style.width = '280px';
+    root.style.height = '360px';
     root.style.pointerEvents = 'none';
     root.style.contain = 'layout style paint';
   }
   function injectTypetchiRoot() {
     const existingRoot = document.getElementById(ROOT_ID);
     if (existingRoot) {
-      console.log('[Typetchi] root already exists, skip injection');
+      console.log('[Typetchi] root already exists, skip mount');
       return false;
     }
     const root = document.createElement('div');
     root.id = ROOT_ID;
     applyRootStyles(root);
-    document.body.append(root);
+    getMountParent().appendChild(root);
     console.log('[Typetchi] root injected');
 
     shadowRoot = root.attachShadow({ mode: 'open' });
@@ -138,8 +183,8 @@
     style.textContent = `
       :host { all: initial; }
       #typetchi-app { pointer-events: none; }
-      .typetchi-widget { position: fixed; z-index: 2147483647; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.75); border-radius: 22px; background: rgba(255,249,244,.92); box-shadow: 0 18px 50px rgba(91,68,56,.22); color: #574941; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; backdrop-filter: blur(14px); pointer-events: auto; }
-      .typetchi-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px 16px; background: linear-gradient(135deg, rgba(255,218,226,.78), rgba(222,248,235,.66)); cursor: grab; user-select: none; }
+      .typetchi-widget { position: fixed; z-index: 2147483647; box-sizing: border-box; display: flex; flex-direction: column; overflow: visible; border: 1px solid rgba(255,255,255,.75); border-radius: 22px; background: rgba(255,249,244,.92); box-shadow: 0 18px 50px rgba(91,68,56,.22); color: #574941; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; backdrop-filter: blur(14px); pointer-events: auto; transform-origin: bottom right; transform: translateY(0) scale(1); opacity: 1; transition: transform 180ms ease, opacity 180ms ease; }
+      .typetchi-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px 16px; background: linear-gradient(135deg, rgba(255,218,226,.78), rgba(222,248,235,.66)); cursor: grab; user-select: none; border-radius: 22px 22px 0 0; }
       .typetchi-title { font-weight: 800; letter-spacing: .02em; }
       .typetchi-controls { display: flex; gap: 6px; }
       button { border: 0; border-radius: 999px; background: rgba(255,255,255,.72); color: #6b5a52; cursor: pointer; font-size: 12px; padding: 5px 8px; pointer-events: auto; }
@@ -156,7 +201,9 @@
       .typetchi-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffb7c5, #ffd88a, #9ee7c6); transition: width 220ms ease; }
       .typetchi-resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; pointer-events: auto; }
       .typetchi-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
-      .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize { display: none; }
+      .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); }
+      .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize { visibility: hidden; pointer-events: none; }
+      .typetchi-collapsed .typetchi-header { border-radius: 22px; }
       .typetchi-reopen { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; box-shadow: 0 12px 28px rgba(91,68,56,.2); pointer-events: auto; }
       @keyframes typetchi-float { 0%,100% { translate: 0 0; } 50% { translate: 0 -8px; } }
     `;
@@ -192,7 +239,7 @@
     widget.style.left = widgetState.x + 'px';
     widget.style.top = widgetState.y + 'px';
     widget.style.width = widgetState.width + 'px';
-    if (!widgetState.collapsed) widget.style.height = widgetState.height + 'px';
+    widget.style.height = widgetState.height + 'px';
 
     const header = document.createElement('header');
     header.className = 'typetchi-header';
@@ -203,7 +250,7 @@
     controls.className = 'typetchi-controls';
     controls.append(
       createButton(widgetState.pinned ? '解除固定' : '固定', () => setWidget({ ...widgetState, pinned: !widgetState.pinned })),
-      createButton(widgetState.collapsed ? '展開' : '收合', () => setWidget({ ...widgetState, collapsed: !widgetState.collapsed })),
+      createButton(widgetState.collapsed ? '展開' : '收合', toggleCollapse),
       createButton('重置', () => setWidget(defaultWidgetState())),
       createButton('關閉', () => setWidget({ ...widgetState, closed: true })),
     );
@@ -262,6 +309,12 @@
     scheduleWidgetFlush(widgetState);
     render();
   }
+
+  function toggleCollapse() {
+    const collapsed = !widgetState.collapsed;
+    console.log(collapsed ? '[Typetchi] widget collapsed' : '[Typetchi] widget expanded');
+    setWidget({ ...widgetState, collapsed });
+  }
   function addTypingExp(addedChars) {
     const totalExp = petState.totalExp + addedChars;
     petState = { ...petState, totalExp, level: calculateLevel(totalExp), currentStage: calculateStage(totalExp), todayTypedCount: petState.todayTypedCount + addedChars, lastActiveDate: dateKey() };
@@ -318,14 +371,54 @@
       render();
     });
   }
-  function start() {
-    console.log('[Typetchi] document body ready');
-    if (!injectTypetchiRoot()) return;
+  function ensureTypetchiRoot() {
+    if (isMounting) return;
+    if (hasTypetchiRoot()) return;
+    isMounting = true;
+    try {
+      if (injectTypetchiRoot()) {
+        console.log('[Typetchi] root ensured');
+        render();
+      }
+    } catch (error) {
+      console.error('[Typetchi] failed to ensure root', error);
+    } finally {
+      isMounting = false;
+    }
+  }
+  function scheduleEnsureRoot() {
+    if (ensureRootTimer) window.clearTimeout(ensureRootTimer);
+    ensureRootTimer = window.setTimeout(() => {
+      ensureTypetchiRoot();
+    }, 300);
+  }
+  function observeRootRemoval() {
+    if (rootRemovalObserver) return rootRemovalObserver;
+    const target = document.documentElement;
+    const observer = new MutationObserver(() => {
+      if (!document.getElementById(ROOT_ID)) {
+        console.warn('[Typetchi] root removed, reinjecting');
+        scheduleEnsureRoot();
+      }
+    });
+    observer.observe(target, { childList: true, subtree: true });
+    console.log('[Typetchi] root removal observer started');
+    rootRemovalObserver = observer;
+    return observer;
+  }
+  function startTypetchi() {
+    console.log('[Typetchi] content script loaded');
+    ensureTypetchiRoot();
+    observeRootRemoval();
     attachGlobalListeners();
     loadStorageAndRender();
+    window.setTimeout(() => { console.log('[Typetchi] delayed ensure root 1000ms'); ensureTypetchiRoot(); }, 1000);
+    window.setTimeout(() => { console.log('[Typetchi] delayed ensure root 3000ms'); ensureTypetchiRoot(); }, 3000);
+    window.setTimeout(() => { console.log('[Typetchi] delayed ensure root 5000ms'); ensureTypetchiRoot(); }, 5000);
+    window.addEventListener('load', () => { console.log('[Typetchi] window loaded, ensure root'); ensureTypetchiRoot(); }, { once: true });
   }
 
-  if (document.body) start();
-  else window.addEventListener('DOMContentLoaded', start, { once: true });
+  if (document.body) startTypetchi();
+  else window.addEventListener('DOMContentLoaded', startTypetchi, { once: true });
 })();
 
