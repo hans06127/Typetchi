@@ -12,7 +12,6 @@
 .muted { color: #8a786e; }
 .resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; }
 .resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
-.closed { display: none; }
 .collapsedHandle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255, 249, 244, .96); box-shadow: 0 8px 22px rgba(91,68,56,.18); transform: translateX(-50%); cursor: pointer; pointer-events: auto; }
 .collapsedHandle::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; opacity: 0; transform: translateX(-50%) translateY(4px); transition: opacity 140ms ease, transform 140ms ease; pointer-events: none; }
 .collapsedHandle:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -21,4 +20,3 @@
 .collapsed .collapsedHandle { display: flex; visibility: visible; }
 .collapsed [class*='toast'] { right: 50%; bottom: 52px; transform: translateX(50%); }
 @media (prefers-reduced-motion: reduce) { .widget, .collapsedHandle, .collapsedHandle::after { animation: none !important; transition: none !important; } }
-.reopen { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; padding: 8px 12px; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); color: #574941; box-shadow: 0 12px 28px rgba(91,68,56,.2); font-size: 12px; font-weight: 800; cursor: pointer; pointer-events: auto; }

@@ -1,12 +1,13 @@
 {
   "name": "typetchi",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-dist.mjs --watch",
     "build": "node scripts/build-dist.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:version": "node scripts/check-version.mjs"
   },
   "dependencies": {
     "vite": "latest",
