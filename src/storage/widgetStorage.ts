@@ -4,6 +4,8 @@ import { clamp } from '../utils/clamp';
 import { getStorageValue, setStorageValue } from './extensionStorage';
 import { STORAGE_KEYS } from './storageKeys';
 
+const COLLAPSED_HANDLE_BOUNDS = { width: 64, height: 52 };
+
 function numberOrFallback(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
@@ -19,17 +21,19 @@ export function normalizeWidgetState(rawState: unknown): WidgetState {
   const heightMax = Math.max(280, Math.min(560, window.innerHeight - 32));
   const width = clamp(numberOrFallback(state.width, defaults.width), 240, widthMax);
   const height = clamp(numberOrFallback(state.height, defaults.height), 280, heightMax);
+  const collapsed = typeof state.collapsed === 'boolean' ? state.collapsed : defaults.collapsed;
+  const positionBounds = collapsed ? COLLAPSED_HANDLE_BOUNDS : { width, height };
 
   return {
     ...defaults,
     ...state,
-    x: clamp(numberOrFallback(state.x, defaults.x), 8, Math.max(8, window.innerWidth - width - 8)),
-    y: clamp(numberOrFallback(state.y, defaults.y), 8, Math.max(8, window.innerHeight - height - 8)),
+    x: clamp(numberOrFallback(state.x, defaults.x), 8, Math.max(8, window.innerWidth - positionBounds.width - 8)),
+    y: clamp(numberOrFallback(state.y, defaults.y), 8, Math.max(8, window.innerHeight - positionBounds.height - 8)),
     width,
     height,
     pinned: typeof state.pinned === 'boolean' ? state.pinned : defaults.pinned,
-    collapsed: typeof state.collapsed === 'boolean' ? state.collapsed : defaults.collapsed,
-    closed: false,
+    collapsed,
+    closed: typeof state.closed === 'boolean' ? state.closed : defaults.closed,
     updatedAt: numberOrFallback(state.updatedAt, defaults.updatedAt ?? 0) || undefined,
   };
 }

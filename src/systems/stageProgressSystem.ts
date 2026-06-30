@@ -1,3 +1,6 @@
+import { evolutionStages } from '../config/evolutionStages';
+import { calculateStage } from './evolutionSystem';
+
 export interface StageProgress {
   current: number;
   required: number;
@@ -6,14 +9,23 @@ export interface StageProgress {
 }
 
 export function calculateStageProgress(totalExp: number): StageProgress {
-  if (totalExp < 500) {
-    return { current: totalExp, required: 500, percentage: Math.min((totalExp / 500) * 100, 100), isMaxStage: false };
+  const currentStageId = calculateStage(totalExp);
+  const currentStageIndex = evolutionStages.findIndex((stage) => stage.id === currentStageId);
+  const currentStage = evolutionStages[Math.max(0, currentStageIndex)];
+  const nextStage = evolutionStages.find((stage) => stage.requiredExp > totalExp);
+
+  if (!nextStage) {
+    return { current: currentStage.requiredExp, required: currentStage.requiredExp, percentage: 100, isMaxStage: true };
   }
 
-  if (totalExp < 2000) {
-    const current = totalExp - 500;
-    return { current, required: 1500, percentage: Math.min((current / 1500) * 100, 100), isMaxStage: false };
-  }
+  const stageStartExp = currentStage.requiredExp;
+  const required = Math.max(1, nextStage.requiredExp - stageStartExp);
+  const current = Math.max(0, totalExp - stageStartExp);
 
-  return { current: 2000, required: 2000, percentage: 100, isMaxStage: true };
+  return {
+    current,
+    required,
+    percentage: Math.min((current / required) * 100, 100),
+    isMaxStage: false,
+  };
 }

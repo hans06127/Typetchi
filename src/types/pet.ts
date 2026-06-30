@@ -21,7 +21,7 @@ export interface EvolutionStage {
 }
 
 export interface EvolutionNode {
-  id: string;
+  id: PetStageId;
   name: string;
   requiredExp: number;
   parentId?: string;

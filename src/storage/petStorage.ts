@@ -12,7 +12,7 @@ export async function loadPetState(): Promise<UserPetState> {
   return {
     ...state,
     level: calculateLevel(state.totalExp),
-    currentStage: calculateStage(state.totalExp),
+    currentStage: calculateStage(state.totalExp, { todayMaxCpm: state.todayMaxCpm }),
     todayTypedCount: state.lastActiveDate === today ? state.todayTypedCount : 0,
     todayMaxCpm: state.lastActiveDate === today ? (state.todayMaxCpm ?? 0) : 0,
     todayMaxWpm: state.lastActiveDate === today ? (state.todayMaxWpm ?? 0) : 0,

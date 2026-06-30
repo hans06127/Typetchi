@@ -15,11 +15,13 @@
   const TYPING_SESSION_IDLE_TIMEOUT = 10000;
   const TYPING_EVENT_RETENTION_MS = 120000;
   const TYPING_SPEED_WINDOW_MS = 60000;
-  const STAGES = [
-    { id: 'stage_1', name: '幼年期', requiredExp: 0, icon: '🌱' },
-    { id: 'stage_2', name: '成長期', requiredExp: 500, icon: '🌿' },
-    { id: 'stage_3', name: '成熟期', requiredExp: 2000, icon: '🌸' },
+  const COLLAPSED_HANDLE_BOUNDS = { width: 64, height: 52 };
+  const EVOLUTION_NODES = [
+    { id: 'stage_1', name: '幼年期', requiredExp: 0, icon: '🌱', conditions: [{ type: 'total_exp', operator: '>=', value: 0 }] },
+    { id: 'stage_2', name: '成長期', requiredExp: 500, icon: '🌿', parentId: 'stage_1', conditions: [{ type: 'total_exp', operator: '>=', value: 500 }] },
+    { id: 'stage_3', name: '成熟期', requiredExp: 2000, icon: '🌸', parentId: 'stage_2', conditions: [{ type: 'total_exp', operator: '>=', value: 2000 }] },
   ];
+  const STAGES = EVOLUTION_NODES.map(({ id, name, requiredExp, icon }) => ({ id, name, requiredExp, icon }));
 
   console.log('[Typetchi] content script loaded');
 
@@ -51,6 +53,7 @@
   let typingEvents = [];
   let typingStatsActiveDate = dateKey();
   let typingSpeedState = { recentCpm: 0, recentWpm: 0, todayMaxCpm: 0, todayMaxWpm: 0, sessionChars: 0, sessionStartedAt: null, lastTypedAt: null };
+  let collapsedHandleMoved = false;
 
   function dateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -100,16 +103,18 @@
     const heightMax = Math.max(280, Math.min(560, window.innerHeight - 32));
     const width = clamp(numberOrFallback(state.width, defaults.width), 240, widthMax);
     const height = clamp(numberOrFallback(state.height, defaults.height), 280, heightMax);
+    const collapsed = typeof state.collapsed === 'boolean' ? state.collapsed : defaults.collapsed;
+    const positionBounds = collapsed ? COLLAPSED_HANDLE_BOUNDS : { width, height };
     return {
       ...defaults,
       ...state,
-      x: clamp(numberOrFallback(state.x, defaults.x), 8, Math.max(8, window.innerWidth - width - 8)),
-      y: clamp(numberOrFallback(state.y, defaults.y), 8, Math.max(8, window.innerHeight - height - 8)),
+      x: clamp(numberOrFallback(state.x, defaults.x), 8, Math.max(8, window.innerWidth - positionBounds.width - 8)),
+      y: clamp(numberOrFallback(state.y, defaults.y), 8, Math.max(8, window.innerHeight - positionBounds.height - 8)),
       width,
       height,
       pinned: typeof state.pinned === 'boolean' ? state.pinned : defaults.pinned,
-      collapsed: typeof state.collapsed === 'boolean' ? state.collapsed : defaults.collapsed,
-      closed: false,
+      collapsed,
+      closed: typeof state.closed === 'boolean' ? state.closed : defaults.closed,
       updatedAt: numberOrFallback(state.updatedAt, 0) || undefined,
     };
   }
@@ -195,21 +200,42 @@
   function calculateLevel(totalExp) {
     return Math.floor(totalExp / 100) + 1;
   }
-  function calculateStage(totalExp) {
-    if (totalExp >= 2000) return 'stage_3';
-    if (totalExp >= 500) return 'stage_2';
-    return 'stage_1';
+  function compareEvolutionValue(left, operator, right) {
+    if (operator === '>=') return left >= right;
+    if (operator === '<=') return left <= right;
+    return left === right;
+  }
+  function evaluateEvolutionCondition(condition, context) {
+    if (condition.type === 'total_exp') return compareEvolutionValue(context.totalExp, condition.operator, Number(condition.value));
+    if (condition.type === 'typing_speed') return compareEvolutionValue(context.todayMaxCpm ?? 0, condition.operator, Number(condition.value));
+    if (condition.type === 'daily_streak') return compareEvolutionValue(context.dailyStreak ?? 0, condition.operator, Number(condition.value));
+    if (condition.type === 'special_event') return condition.operator === '===' && context.specialEvents?.includes(String(condition.value));
+    return false;
+  }
+  function canUnlockEvolutionNode(node, context) {
+    const conditions = node.conditions ?? [{ type: 'total_exp', operator: '>=', value: node.requiredExp }];
+    return conditions.every((condition) => evaluateEvolutionCondition(condition, context));
+  }
+  function calculateStage(totalExp, context = {}) {
+    const resolvedContext = { ...context, totalExp };
+    return EVOLUTION_NODES.filter((node) => canUnlockEvolutionNode(node, resolvedContext))
+      .reduce((stageId, node) => totalExp >= node.requiredExp ? node.id : stageId, 'stage_1');
   }
   function getStage(totalExp) {
     return STAGES.find((stage) => stage.id === calculateStage(totalExp)) ?? STAGES[0];
   }
   function getNextStage(totalExp) {
-    return STAGES.find((stage) => stage.requiredExp > totalExp);
+    const currentStageId = calculateStage(totalExp);
+    return STAGES.find((stage) => stage.requiredExp > totalExp && stage.id !== currentStageId);
   }
   function calculateStageProgress(totalExp) {
-    if (totalExp < 500) return { current: totalExp, required: 500, percentage: Math.min((totalExp / 500) * 100, 100), isMaxStage: false };
-    if (totalExp < 2000) { const current = totalExp - 500; return { current, required: 1500, percentage: Math.min((current / 1500) * 100, 100), isMaxStage: false }; }
-    return { current: 2000, required: 2000, percentage: 100, isMaxStage: true };
+    const currentStageId = calculateStage(totalExp);
+    const currentStage = STAGES.find((stage) => stage.id === currentStageId) ?? STAGES[0];
+    const nextStage = STAGES.find((stage) => stage.requiredExp > totalExp);
+    if (!nextStage) return { current: currentStage.requiredExp, required: currentStage.requiredExp, percentage: 100, isMaxStage: true };
+    const required = Math.max(1, nextStage.requiredExp - currentStage.requiredExp);
+    const current = Math.max(0, totalExp - currentStage.requiredExp);
+    return { current, required, percentage: Math.min((current / required) * 100, 100), isMaxStage: false };
   }
   function playAnimation(nextState) {
     const priority = { idle: 0, typing: 1, happy: 2, level_up: 3, evolve: 4 };
@@ -362,8 +388,8 @@
       .typetchi-resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; pointer-events: auto; }
       .typetchi-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
       .typetchi-handle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); transform: translateX(-50%); box-shadow: 0 8px 22px rgba(91,68,56,.18); pointer-events: auto; } .typetchi-handle:hover::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; } .typetchi-handle .typetchi-pet { width: 32px; height: 32px; }
-      .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
-      .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize, .typetchi-collapsed .typetchi-footer { visibility: hidden; pointer-events: none; }
+      .typetchi-collapsed { width: 64px !important; height: 52px !important; min-width: 64px; min-height: 52px; max-width: 64px; max-height: 52px; overflow: visible; transform: none; background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; pointer-events: none; }
+      .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize, .typetchi-collapsed .typetchi-footer, .typetchi-collapsed .typetchi-toast { display: none; pointer-events: none; }
       .typetchi-collapsed .typetchi-handle { display: flex; visibility: visible; }
       @keyframes typetchi-idle { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } } @keyframes typetchi-typing { 0% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-6px) rotate(-3deg); } 70% { transform: translateY(0) rotate(3deg); } 100% { transform: translateY(0) rotate(0); } } @keyframes typetchi-happy { 0%,100% { transform: scale(1); } 40% { transform: scale(1.12); } 70% { transform: scale(.96); } } @keyframes typetchi-level-up { 0% { transform: scale(1); filter: brightness(1); } 40% { transform: scale(1.18); filter: brightness(1.25); } 100% { transform: scale(1); filter: brightness(1); } } @keyframes typetchi-evolve { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 40% { transform: scale(1.25); opacity: .7; filter: brightness(1.8); } 70% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1); opacity: 1; filter: brightness(1); } } @keyframes typetchi-exp-toast { 0% { transform: translateY(6px) scale(.96); } 35% { transform: translateY(-6px) scale(1.04); } 100% { transform: translateY(-4px) scale(1); } } @media (prefers-reduced-motion: reduce) { .typetchi-widget, .typetchi-pet, .typetchi-fill, .typetchi-toast, .typetchi-bubble { animation: none !important; transition: none !important; } }
     `;
@@ -394,6 +420,7 @@
   function render() {
     if (!appRoot) return;
     appRoot.replaceChildren();
+    if (widgetState.closed) return;
     const stage = getStage(petState.totalExp);
     const nextStage = getNextStage(petState.totalExp);
     const progress = calculateStageProgress(petState.totalExp);
@@ -411,7 +438,16 @@
     handle.className = 'typetchi-handle';
     handle.title = '展開 Typetchi';
     handle.setAttribute('aria-label', '展開 Typetchi');
-    handle.addEventListener('click', toggleCollapse);
+    handle.addEventListener('pointerdown', startCollapsedHandleDrag);
+    handle.addEventListener('click', (event) => {
+      if (collapsedHandleMoved) {
+        event.preventDefault();
+        event.stopPropagation();
+        collapsedHandleMoved = false;
+        return;
+      }
+      toggleCollapse();
+    });
     handle.append(createPetElement(stage.id, true));
 
     const header = document.createElement('header');
@@ -424,7 +460,7 @@
     controls.append(
       createButton(widgetState.pinned ? '解除固定' : '固定', () => setWidget({ ...widgetState, pinned: !widgetState.pinned })),
       createButton(widgetState.collapsed ? '展開' : '收合', toggleCollapse),
-      createButton('收合', () => setWidget({ ...widgetState, collapsed: true, closed: false })),
+      createButton('關閉', closeWidget),
     );
     header.append(title, controls);
 
@@ -500,11 +536,15 @@
     scheduleWidgetFlush(widgetState);
     render();
   }
+  function closeWidget() {
+    console.log('[Typetchi] widget closed');
+    setWidget({ ...widgetState, collapsed: false, closed: true });
+  }
 
   function toggleCollapse() {
     const collapsed = !widgetState.collapsed;
     console.log(collapsed ? '[Typetchi] widget collapsed' : '[Typetchi] widget expanded');
-    setWidget({ ...widgetState, collapsed });
+    setWidget({ ...widgetState, collapsed, closed: false });
   }
   function addTypingExp(addedChars) {
     const today = dateKey();
@@ -513,7 +553,7 @@
     if (!isSameDay) typingSpeedState = { recentCpm: 0, recentWpm: 0, todayMaxCpm: 0, todayMaxWpm: 0, sessionChars: 0, sessionStartedAt: null, lastTypedAt: null };
     const previous = petState;
     const totalExp = petState.totalExp + addedChars;
-    petState = { ...petState, totalExp, level: calculateLevel(totalExp), currentStage: calculateStage(totalExp), todayTypedCount: todayTypedCount + addedChars, todayMaxCpm: isSameDay ? (petState.todayMaxCpm ?? 0) : 0, todayMaxWpm: isSameDay ? (petState.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
+    petState = { ...petState, totalExp, level: calculateLevel(totalExp), currentStage: calculateStage(totalExp, { todayMaxCpm: petState.todayMaxCpm }), todayTypedCount: todayTypedCount + addedChars, todayMaxCpm: isSameDay ? (petState.todayMaxCpm ?? 0) : 0, todayMaxWpm: isSameDay ? (petState.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
     const evolved = previous.currentStage !== petState.currentStage;
     const leveledUp = previous.level < petState.level;
     playAnimation(evolved ? 'evolve' : leveledUp ? 'level_up' : 'happy');
@@ -526,13 +566,30 @@
     if (widgetState.pinned || event.target.closest('.typetchi-controls')) return;
     const start = { x: event.clientX, y: event.clientY, left: widgetState.x, top: widgetState.y };
     const onMove = (moveEvent) => {
-      widgetState = { ...widgetState, x: clamp(start.left + moveEvent.clientX - start.x, 8, window.innerWidth - widgetState.width - 8), y: clamp(start.top + moveEvent.clientY - start.y, 8, window.innerHeight - widgetState.height - 8) };
+      const boundsWidth = widgetState.collapsed ? COLLAPSED_HANDLE_BOUNDS.width : widgetState.width;
+      const boundsHeight = widgetState.collapsed ? COLLAPSED_HANDLE_BOUNDS.height : widgetState.height;
+      widgetState = { ...widgetState, x: clamp(start.left + moveEvent.clientX - start.x, 8, window.innerWidth - boundsWidth - 8), y: clamp(start.top + moveEvent.clientY - start.y, 8, window.innerHeight - boundsHeight - 8) };
       scheduleWidgetFlush(widgetState);
       render();
     };
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); flushWidgetState(); };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
+  }
+
+  function startCollapsedHandleDrag(event) {
+    const start = { x: event.clientX, y: event.clientY };
+    collapsedHandleMoved = false;
+    const onMove = (moveEvent) => {
+      if (Math.abs(moveEvent.clientX - start.x) > 4 || Math.abs(moveEvent.clientY - start.y) > 4) collapsedHandleMoved = true;
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    startDrag(event);
   }
   function startResize(event) {
     if (widgetState.pinned) return;
@@ -579,7 +636,7 @@
         applyRemoteState(() => {
           const today = dateKey();
           const remotePet = petChange.newValue;
-          petState = { ...remotePet, level: calculateLevel(remotePet.totalExp), currentStage: calculateStage(remotePet.totalExp), todayTypedCount: remotePet.lastActiveDate === today ? remotePet.todayTypedCount : 0, todayMaxCpm: remotePet.lastActiveDate === today ? (remotePet.todayMaxCpm ?? 0) : 0, todayMaxWpm: remotePet.lastActiveDate === today ? (remotePet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
+          petState = { ...remotePet, level: calculateLevel(remotePet.totalExp), currentStage: calculateStage(remotePet.totalExp, { todayMaxCpm: remotePet.todayMaxCpm }), todayTypedCount: remotePet.lastActiveDate === today ? remotePet.todayTypedCount : 0, todayMaxCpm: remotePet.lastActiveDate === today ? (remotePet.todayMaxCpm ?? 0) : 0, todayMaxWpm: remotePet.lastActiveDate === today ? (remotePet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
           typingSpeedState = { ...typingSpeedState, todayMaxCpm: petState.todayMaxCpm, todayMaxWpm: petState.todayMaxWpm };
           render();
         });
@@ -601,7 +658,7 @@
   function loadStorageAndRender() {
     Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState())]).then(([storedPet, storedWidget]) => {
       const today = dateKey();
-      petState = { ...storedPet, level: calculateLevel(storedPet.totalExp), currentStage: calculateStage(storedPet.totalExp), todayTypedCount: storedPet.lastActiveDate === today ? storedPet.todayTypedCount : 0, todayMaxCpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxCpm ?? 0) : 0, todayMaxWpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
+      petState = { ...storedPet, level: calculateLevel(storedPet.totalExp), currentStage: calculateStage(storedPet.totalExp, { todayMaxCpm: storedPet.todayMaxCpm }), todayTypedCount: storedPet.lastActiveDate === today ? storedPet.todayTypedCount : 0, todayMaxCpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxCpm ?? 0) : 0, todayMaxWpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
       typingSpeedState = { ...typingSpeedState, todayMaxCpm: petState.todayMaxCpm, todayMaxWpm: petState.todayMaxWpm };
       widgetState = normalizeWidgetState(storedWidget);
       console.log('[Typetchi] storage loaded');

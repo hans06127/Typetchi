@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createDefaultWidgetState } from '../../config/defaultState';
 import { getNextStage, getStage } from '../../systems/evolutionSystem';
 import { calculateStageProgress } from '../../systems/stageProgressSystem';
@@ -39,24 +39,58 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
     });
   }, []);
   useEffect(() => { onWidgetStateReady?.(applyRemoteWidgetState); }, [applyRemoteWidgetState, onWidgetStateReady]);
-  const updateWidget = useCallback((next: WidgetState) => { setWidget(next); scheduleWidgetFlush(next); }, [scheduleWidgetFlush]);
+  const updateWidget = useCallback((next: WidgetState) => {
+    const normalizedNext = normalizeWidgetState(next);
+    setWidget(normalizedNext);
+    scheduleWidgetFlush(normalizedNext);
+  }, [scheduleWidgetFlush]);
+  const closeWidget = useCallback(() => {
+    console.log('[Typetchi] widget closed');
+    updateWidget({ ...widget, collapsed: false, closed: true });
+  }, [updateWidget, widget]);
+  const handleDragState = useRef({ moved: false, startX: 0, startY: 0 });
   const drag = useDraggable(widget, updateWidget);
   const resize = useResizable(widget, updateWidget);
   const toggleCollapse = useCallback(() => {
     const collapsed = !widget.collapsed;
     console.log(collapsed ? '[Typetchi] widget collapsed' : '[Typetchi] widget expanded');
-    updateWidget({ ...widget, collapsed });
+    updateWidget({ ...widget, collapsed, closed: false });
   }, [updateWidget, widget]);
+  const handleCollapsedPointerDown = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    handleDragState.current = { moved: false, startX: event.clientX, startY: event.clientY };
+    const onMove = (moveEvent: PointerEvent) => {
+      if (Math.abs(moveEvent.clientX - handleDragState.current.startX) > 4 || Math.abs(moveEvent.clientY - handleDragState.current.startY) > 4) {
+        handleDragState.current.moved = true;
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    drag(event);
+  }, [drag]);
+  const handleCollapsedClick = useCallback((event: globalThis.MouseEvent) => {
+    if (handleDragState.current.moved) {
+      event.preventDefault();
+      event.stopPropagation();
+      handleDragState.current.moved = false;
+      return;
+    }
+    toggleCollapse();
+  }, [toggleCollapse]);
   const stage = getStage(petState.currentStage);
   const nextStage = getNextStage(petState.totalExp);
   const stageProgress = calculateStageProgress(petState.totalExp);
+  if (widget.closed) return null;
   return <section className={`${styles.widget} ${widget.collapsed ? styles.collapsed : ''}`} style={{ left: widget.x, top: widget.y, width: widget.width, height: widget.height, '--typetchi-expanded-height': `${widget.height}px` } as Record<string, string | number>}>
-    <button className={styles.collapsedHandle} type="button" title="展開 Typetchi" aria-label="展開 Typetchi" onClick={toggleCollapse}>
+    <button className={styles.collapsedHandle} type="button" title="展開 Typetchi" aria-label="展開 Typetchi" onPointerDown={handleCollapsedPointerDown} onClick={handleCollapsedClick}>
       <PetCharacter stage={petState.currentStage} animationState={animationState} compact />
     </button>
     <header className={styles.header} onPointerDown={drag}>
       <span className={styles.title}>Typetchi</span>
-      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onClose={() => updateWidget({ ...widget, collapsed: true, closed: false })} />
+      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onClose={closeWidget} />
     </header>
     <div className={styles.body}>
       <SpeechBubble message={speechBubble.message} visible={speechBubble.visible} />

@@ -4,6 +4,6 @@ export function WidgetControls({ pinned, collapsed, onTogglePin, onToggleCollaps
   return <div className={styles.controls}>
     <button className={styles.button} type="button" onClick={onTogglePin}>{pinned ? '解除固定' : '固定'}</button>
     <button className={styles.button} type="button" onClick={onToggleCollapse}>{collapsed ? '展開' : '收合'}</button>
-    <button className={styles.button} type="button" title="收合小視窗" onClick={onClose}>收合</button>
+    <button className={styles.button} type="button" title="關閉小視窗" onClick={onClose}>關閉</button>
   </div>;
 }

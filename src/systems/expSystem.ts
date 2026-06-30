@@ -14,7 +14,7 @@ export function applyTypingExp(state: UserPetState, addedChars: number): UserPet
     ...state,
     totalExp: nextTotalExp,
     level: calculateLevel(nextTotalExp),
-    currentStage: calculateStage(nextTotalExp),
+    currentStage: calculateStage(nextTotalExp, { todayMaxCpm: state.todayMaxCpm }),
     todayTypedCount: todayTypedCount + addedChars,
     todayMaxCpm: isSameDay ? (state.todayMaxCpm ?? 0) : 0,
     todayMaxWpm: isSameDay ? (state.todayMaxWpm ?? 0) : 0,
