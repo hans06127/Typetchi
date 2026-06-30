@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PetWidget } from '../components/PetWidget/PetWidget';
 import { useExpGainToast } from '../hooks/useExpGainToast';
@@ -8,6 +8,8 @@ import { usePetProgress, type TypingProgressResult } from '../hooks/usePetProgre
 import { useSpeechBubble } from '../hooks/useSpeechBubble';
 import { useTypingStats } from '../hooks/useTypingStats';
 import { useTypingTracker, type ValidTypingInput } from '../hooks/useTypingTracker';
+import { useStorageSync } from '../hooks/useStorageSync';
+import type { WidgetState } from '../types/widget';
 import { hasTypetchiRoot, injectTypetchiRoot, ROOT_ID } from './injectRoot';
 
 let isMounting = false;
@@ -26,7 +28,15 @@ function App() {
     else if (result.leveledUp) speechBubble.showMessage('levelUp', true);
     else speechBubble.showMessage('typing');
   }, [animation, expToast, speechBubble]);
-  const { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress } = usePetProgress(handleTypingProgress);
+  const { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress, applyRemotePetState } = usePetProgress(handleTypingProgress);
+  const applyRemoteWidgetStateRef = useRef<((nextState: WidgetState) => void) | null>(null);
+  const registerWidgetSync = useCallback((handler: (nextState: WidgetState) => void) => {
+    applyRemoteWidgetStateRef.current = handler;
+  }, []);
+  const handleRemoteWidgetState = useCallback((nextState: WidgetState) => {
+    applyRemoteWidgetStateRef.current?.(nextState);
+  }, []);
+  useStorageSync({ onPetStateChanged: applyRemotePetState, onWidgetStateChanged: handleRemoteWidgetState });
   const { speedState, recordTyping, resetTypingStats } = useTypingStats({
     todayMaxCpm: petState.todayMaxCpm,
     todayMaxWpm: petState.todayMaxWpm,
@@ -45,7 +55,7 @@ function App() {
     speechBubble.showMessage('resetProgress', true);
   }, [resetProgress, resetTypingStats, speechBubble]);
 
-  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} onResetPetProgress={handleResetPetProgress} />;
+  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} onResetPetProgress={handleResetPetProgress} onWidgetStateReady={registerWidgetSync} />;
 }
 
 function ensureTypetchiRoot() {
