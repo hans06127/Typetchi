@@ -40,6 +40,13 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
   }, []);
   useEffect(() => { onWidgetStateReady?.(applyRemoteWidgetState); }, [applyRemoteWidgetState, onWidgetStateReady]);
   const updateWidget = useCallback((next: WidgetState) => { setWidget(next); scheduleWidgetFlush(next); }, [scheduleWidgetFlush]);
+  const closeWidget = useCallback(() => {
+    console.log('[Typetchi] widget closed');
+    setWidget((current) => ({ ...current, collapsed: false, closed: true }));
+  }, []);
+  const reopenWidget = useCallback(() => {
+    setWidget((current) => ({ ...current, collapsed: false, closed: false }));
+  }, []);
   const drag = useDraggable(widget, updateWidget);
   const resize = useResizable(widget, updateWidget);
   const toggleCollapse = useCallback(() => {
@@ -50,13 +57,13 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
   const stage = getStage(petState.currentStage);
   const nextStage = getNextStage(petState.totalExp);
   const stageProgress = calculateStageProgress(petState.totalExp);
-  return <section className={`${styles.widget} ${widget.collapsed ? styles.collapsed : ''}`} style={{ left: widget.x, top: widget.y, width: widget.width, height: widget.height, '--typetchi-expanded-height': `${widget.height}px` } as Record<string, string | number>}>
-    <button className={styles.collapsedHandle} type="button" title="展開 Typetchi" aria-label="展開 Typetchi" onClick={toggleCollapse}>
+  return <section className={`${styles.widget} ${widget.collapsed ? styles.collapsed : ''} ${widget.closed ? styles.closed : ''}`} style={{ left: widget.x, top: widget.y, width: widget.width, height: widget.height, '--typetchi-expanded-height': `${widget.height}px` } as Record<string, string | number>}>
+    <button className={styles.collapsedHandle} type="button" title={widget.closed ? '開啟 Typetchi' : '展開 Typetchi'} aria-label={widget.closed ? '開啟 Typetchi' : '展開 Typetchi'} onClick={widget.closed ? reopenWidget : toggleCollapse}>
       <PetCharacter stage={petState.currentStage} animationState={animationState} compact />
     </button>
     <header className={styles.header} onPointerDown={drag}>
       <span className={styles.title}>Typetchi</span>
-      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onClose={() => updateWidget({ ...widget, collapsed: true, closed: false })} />
+      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onClose={closeWidget} />
     </header>
     <div className={styles.body}>
       <SpeechBubble message={speechBubble.message} visible={speechBubble.visible} />

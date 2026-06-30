@@ -384,6 +384,9 @@
       .typetchi-resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; pointer-events: auto; }
       .typetchi-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
       .typetchi-handle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); transform: translateX(-50%); box-shadow: 0 8px 22px rgba(91,68,56,.18); pointer-events: auto; } .typetchi-handle:hover::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; } .typetchi-handle .typetchi-pet { width: 32px; height: 32px; }
+      .typetchi-closed { width: 64px !important; height: 64px !important; min-width: 64px; min-height: 64px; background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
+      .typetchi-closed .typetchi-header, .typetchi-closed .typetchi-body, .typetchi-closed .typetchi-resize, .typetchi-closed .typetchi-footer { visibility: hidden; pointer-events: none; }
+      .typetchi-closed .typetchi-handle { top: 10px; display: flex; visibility: visible; }
       .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
       .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize, .typetchi-collapsed .typetchi-footer { visibility: hidden; pointer-events: none; }
       .typetchi-collapsed .typetchi-handle { display: flex; visibility: visible; }
@@ -422,7 +425,7 @@
     const percent = progress.percentage;
 
     const widget = document.createElement('section');
-    widget.className = 'typetchi-widget' + (widgetState.collapsed ? ' typetchi-collapsed' : '');
+    widget.className = 'typetchi-widget' + (widgetState.collapsed ? ' typetchi-collapsed' : '') + (widgetState.closed ? ' typetchi-closed' : '');
     widget.style.left = widgetState.x + 'px';
     widget.style.top = widgetState.y + 'px';
     widget.style.width = widgetState.width + 'px';
@@ -431,9 +434,9 @@
     const handle = document.createElement('button');
     handle.type = 'button';
     handle.className = 'typetchi-handle';
-    handle.title = '展開 Typetchi';
-    handle.setAttribute('aria-label', '展開 Typetchi');
-    handle.addEventListener('click', toggleCollapse);
+    handle.title = widgetState.closed ? '開啟 Typetchi' : '展開 Typetchi';
+    handle.setAttribute('aria-label', widgetState.closed ? '開啟 Typetchi' : '展開 Typetchi');
+    handle.addEventListener('click', widgetState.closed ? reopenWidget : toggleCollapse);
     handle.append(createPetElement(stage.id, true));
 
     const header = document.createElement('header');
@@ -446,7 +449,7 @@
     controls.append(
       createButton(widgetState.pinned ? '解除固定' : '固定', () => setWidget({ ...widgetState, pinned: !widgetState.pinned })),
       createButton(widgetState.collapsed ? '展開' : '收合', toggleCollapse),
-      createButton('收合', () => setWidget({ ...widgetState, collapsed: true, closed: false })),
+      createButton('關閉', closeWidget),
     );
     header.append(title, controls);
 
@@ -520,6 +523,15 @@
   function setWidget(next) {
     widgetState = normalizeWidgetState(next);
     scheduleWidgetFlush(widgetState);
+    render();
+  }
+  function closeWidget() {
+    console.log('[Typetchi] widget closed');
+    widgetState = { ...widgetState, collapsed: false, closed: true };
+    render();
+  }
+  function reopenWidget() {
+    widgetState = { ...widgetState, collapsed: false, closed: false };
     render();
   }
 

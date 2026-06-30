@@ -15,6 +15,9 @@
 .collapsedHandle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255, 249, 244, .96); box-shadow: 0 8px 22px rgba(91,68,56,.18); transform: translateX(-50%); cursor: pointer; pointer-events: auto; }
 .collapsedHandle::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; opacity: 0; transform: translateX(-50%) translateY(4px); transition: opacity 140ms ease, transform 140ms ease; pointer-events: none; }
 .collapsedHandle:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+.closed { width: 64px !important; height: 64px !important; min-width: 64px; min-height: 64px; background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
+.closed .header, .closed .body, .closed .resize, .closed footer { visibility: hidden; pointer-events: none; }
+.closed .collapsedHandle { top: 10px; display: flex; visibility: visible; }
 .collapsed { height: var(--typetchi-expanded-height, 360px) !important; transform: translateY(calc(100% - 48px)) scale(.96); background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
 .collapsed .header, .collapsed .body, .collapsed .resize, .collapsed footer { visibility: hidden; pointer-events: none; }
 .collapsed .collapsedHandle { display: flex; visibility: visible; }
