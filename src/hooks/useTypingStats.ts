@@ -51,5 +51,11 @@ export function useTypingStats({ todayMaxCpm, todayMaxWpm, onTodayMaxChange }: {
     });
   }, [onTodayMaxChange]);
 
-  return { speedState, recordTyping };
+  const resetTypingStats = useCallback(() => {
+    activeDateRef.current = getLocalDateKey();
+    eventsRef.current = [];
+    setSpeedState(emptySpeedState());
+  }, []);
+
+  return { speedState, recordTyping, resetTypingStats };
 }

@@ -3,6 +3,7 @@ import { defaultPetState } from '../config/defaultState';
 import { applyTypingExp, calculateExpFromTyping } from '../systems/expSystem';
 import type { PetAnimationState, UserPetState } from '../types/pet';
 import { loadPetState, savePetState } from '../storage/petStorage';
+import { resetPetProgress } from '../storage/resetStorage';
 import { useDebouncedStorageFlush } from './useDebouncedStorageFlush';
 
 export interface TypingProgressResult {
@@ -45,5 +46,11 @@ export function usePetProgress(onTypingProgress?: (result: TypingProgressResult)
     });
   }, [onTypingProgress, scheduleFlush]);
 
-  return { petState, addTypingExp, updateTodayTypingSpeedMax, flushNow };
+  const resetProgress = useCallback(async () => {
+    const next = await resetPetProgress();
+    setPetState(next);
+    return next;
+  }, []);
+
+  return { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress, flushNow };
 }

@@ -1,0 +1,4 @@
+.panel { display: grid; gap: 7px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.46); font-size: 13px; }
+.row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
+.label { flex: 0 0 auto; color: #8a786e; }
+.value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: #574941; }

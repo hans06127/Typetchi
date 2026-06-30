@@ -10,10 +10,10 @@ function numberOrFallback(value: number, fallback: number): number {
 
 function normalizeWidgetState(state: WidgetState): WidgetState {
   const defaults = defaultWidgetState();
-  const widthMax = Math.max(220, Math.min(420, window.innerWidth - 16));
-  const heightMax = Math.max(180, Math.min(560, window.innerHeight - 16));
-  const width = clamp(numberOrFallback(state.width, defaults.width), 220, widthMax);
-  const height = clamp(numberOrFallback(state.height, defaults.height), 180, heightMax);
+  const widthMax = Math.max(240, Math.min(420, window.innerWidth - 32));
+  const heightMax = Math.max(280, Math.min(560, window.innerHeight - 32));
+  const width = clamp(numberOrFallback(state.width, defaults.width), 240, widthMax);
+  const height = clamp(numberOrFallback(state.height, defaults.height), 280, heightMax);
 
   return {
     ...defaults,

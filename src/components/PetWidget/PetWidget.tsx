@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { defaultWidgetState } from '../../config/defaultState';
+import { createDefaultWidgetState } from '../../config/defaultState';
 import { getNextStage, getStage } from '../../systems/evolutionSystem';
 import { calculateStageProgress } from '../../systems/stageProgressSystem';
 import { loadWidgetState, saveWidgetState } from '../../storage/widgetStorage';
+import { resetWidgetState } from '../../storage/resetStorage';
 import type { PetAnimationState, UserPetState } from '../../types/pet';
 import type { WidgetState } from '../../types/widget';
 import type { TypingSpeedState } from '../../types/typingStats';
@@ -11,6 +12,8 @@ import { ExpGainToast } from '../ExpGainToast/ExpGainToast';
 import { PetCharacter } from '../PetCharacter/PetCharacter';
 import { SpeechBubble } from '../SpeechBubble/SpeechBubble';
 import { WidgetControls } from '../WidgetControls/WidgetControls';
+import { TypingStatsPanel } from '../TypingStatsPanel/TypingStatsPanel';
+import { SettingsPanel } from '../SettingsPanel/SettingsPanel';
 import { useDraggable } from '../../hooks/useDraggable';
 import { useResizable } from '../../hooks/useResizable';
 import { useDebouncedStorageFlush } from '../../hooks/useDebouncedStorageFlush';
@@ -20,15 +23,21 @@ interface PetWidgetProps {
   petState: UserPetState;
   animationState: PetAnimationState;
   expToast: { amount: number; visible: boolean };
-  speechBubble: { message: string | null; visible: boolean };
+  speechBubble: { message: string | null; visible: boolean; showMessage: (kind: 'typing' | 'levelUp' | 'evolve' | 'paste' | 'resetWidget' | 'resetProgress', force?: boolean) => void };
   speedState: TypingSpeedState;
+  onResetPetProgress: () => void;
 }
 
-export function PetWidget({ petState, animationState, expToast, speechBubble, speedState }: PetWidgetProps) {
-  const [widget, setWidget] = useState<WidgetState>(defaultWidgetState());
+export function PetWidget({ petState, animationState, expToast, speechBubble, speedState, onResetPetProgress }: PetWidgetProps) {
+  const [widget, setWidget] = useState<WidgetState>(createDefaultWidgetState);
   const { scheduleFlush: scheduleWidgetFlush } = useDebouncedStorageFlush<WidgetState>(saveWidgetState, 1000);
   useEffect(() => { void loadWidgetState().then((state) => { console.log('[Typetchi] storage loaded'); setWidget(state); }); }, []);
   const updateWidget = useCallback((next: WidgetState) => { setWidget(next); scheduleWidgetFlush(next); }, [scheduleWidgetFlush]);
+  const handleResetWidgetPosition = useCallback(async () => {
+    const next = await resetWidgetState();
+    setWidget(next);
+    speechBubble.showMessage('resetWidget', true);
+  }, [speechBubble]);
   const drag = useDraggable(widget, updateWidget);
   const resize = useResizable(widget, updateWidget);
   const toggleCollapse = useCallback(() => {
@@ -46,7 +55,7 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
     </button>
     <header className={styles.header} onPointerDown={drag}>
       <span className={styles.title}>Typetchi</span>
-      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onReset={() => updateWidget(defaultWidgetState())} onClose={() => setWidget({ ...widget, closed: true })} />
+      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onClose={() => setWidget({ ...widget, closed: true })} />
     </header>
     <div className={styles.body}>
       <SpeechBubble message={speechBubble.message} visible={speechBubble.visible} />
@@ -55,12 +64,11 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
         <div className={styles.row}><strong>Lv. {petState.level}</strong><span>{stage.name}</span></div>
         <div className={styles.row}><span>EXP</span><span>{stageProgress.isMaxStage ? '最高階段' : `${stageProgress.current} / ${stageProgress.required}`}</span></div>
         <ExpBar value={stageProgress.current} max={stageProgress.required} percentage={stageProgress.percentage} />
-        <div className={styles.row}><span className={styles.muted}>今日輸入</span><span>{petState.todayTypedCount} 字</span></div>
-        <div className={styles.row}><span className={styles.muted}>目前速度</span><span>{speedState.recentCpm} CPM / {speedState.recentWpm} WPM</span></div>
-        <div className={styles.row}><span className={styles.muted}>今日最高</span><span>{speedState.todayMaxCpm} CPM</span></div>
+        <TypingStatsPanel todayTypedCount={petState.todayTypedCount} recentCpm={speedState.recentCpm} recentWpm={speedState.recentWpm} todayMaxCpm={speedState.todayMaxCpm} />
         <div className={styles.row}><span className={styles.muted}>下一階段</span><span>{nextStage?.name ?? '已成熟'}</span></div>
       </div>
     </div>
+    <SettingsPanel onResetWidgetPosition={handleResetWidgetPosition} onResetPetProgress={onResetPetProgress} />
     <ExpGainToast amount={expToast.amount} visible={expToast.visible} />
     <span className={styles.resize} onPointerDown={resize} />
   </section>;
