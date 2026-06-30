@@ -15,6 +15,7 @@
   const TYPING_SESSION_IDLE_TIMEOUT = 10000;
   const TYPING_EVENT_RETENTION_MS = 120000;
   const TYPING_SPEED_WINDOW_MS = 60000;
+  const COLLAPSED_HANDLE_BOUNDS = { width: 64, height: 52 };
   const EVOLUTION_NODES = [
     { id: 'stage_1', name: '幼年期', requiredExp: 0, icon: '🌱', conditions: [{ type: 'total_exp', operator: '>=', value: 0 }] },
     { id: 'stage_2', name: '成長期', requiredExp: 500, icon: '🌿', parentId: 'stage_1', conditions: [{ type: 'total_exp', operator: '>=', value: 500 }] },
@@ -385,8 +386,8 @@
       .typetchi-resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; pointer-events: auto; }
       .typetchi-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
       .typetchi-handle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); transform: translateX(-50%); box-shadow: 0 8px 22px rgba(91,68,56,.18); pointer-events: auto; } .typetchi-handle:hover::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; } .typetchi-handle .typetchi-pet { width: 32px; height: 32px; }
-      .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
-      .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize, .typetchi-collapsed .typetchi-footer { visibility: hidden; pointer-events: none; }
+      .typetchi-collapsed { width: 64px !important; height: 52px !important; min-width: 64px; min-height: 52px; max-width: 64px; max-height: 52px; overflow: visible; transform: none; background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; pointer-events: none; }
+      .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize, .typetchi-collapsed .typetchi-footer, .typetchi-collapsed .typetchi-toast { display: none; pointer-events: none; }
       .typetchi-collapsed .typetchi-handle { display: flex; visibility: visible; }
       @keyframes typetchi-idle { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } } @keyframes typetchi-typing { 0% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-6px) rotate(-3deg); } 70% { transform: translateY(0) rotate(3deg); } 100% { transform: translateY(0) rotate(0); } } @keyframes typetchi-happy { 0%,100% { transform: scale(1); } 40% { transform: scale(1.12); } 70% { transform: scale(.96); } } @keyframes typetchi-level-up { 0% { transform: scale(1); filter: brightness(1); } 40% { transform: scale(1.18); filter: brightness(1.25); } 100% { transform: scale(1); filter: brightness(1); } } @keyframes typetchi-evolve { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 40% { transform: scale(1.25); opacity: .7; filter: brightness(1.8); } 70% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1); opacity: 1; filter: brightness(1); } } @keyframes typetchi-exp-toast { 0% { transform: translateY(6px) scale(.96); } 35% { transform: translateY(-6px) scale(1.04); } 100% { transform: translateY(-4px) scale(1); } } @media (prefers-reduced-motion: reduce) { .typetchi-widget, .typetchi-pet, .typetchi-fill, .typetchi-toast, .typetchi-bubble { animation: none !important; transition: none !important; } }
     `;
@@ -563,7 +564,9 @@
     if (widgetState.pinned || event.target.closest('.typetchi-controls')) return;
     const start = { x: event.clientX, y: event.clientY, left: widgetState.x, top: widgetState.y };
     const onMove = (moveEvent) => {
-      widgetState = { ...widgetState, x: clamp(start.left + moveEvent.clientX - start.x, 8, window.innerWidth - widgetState.width - 8), y: clamp(start.top + moveEvent.clientY - start.y, 8, window.innerHeight - widgetState.height - 8) };
+      const boundsWidth = widgetState.collapsed ? COLLAPSED_HANDLE_BOUNDS.width : widgetState.width;
+      const boundsHeight = widgetState.collapsed ? COLLAPSED_HANDLE_BOUNDS.height : widgetState.height;
+      widgetState = { ...widgetState, x: clamp(start.left + moveEvent.clientX - start.x, 8, window.innerWidth - boundsWidth - 8), y: clamp(start.top + moveEvent.clientY - start.y, 8, window.innerHeight - boundsHeight - 8) };
       scheduleWidgetFlush(widgetState);
       render();
     };
