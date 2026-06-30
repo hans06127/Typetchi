@@ -21,3 +21,6 @@ export const defaultWidgetState = (): WidgetState => ({
   collapsed: false,
   closed: false,
 });
+
+export const createDefaultPetState = defaultPetState;
+export const createDefaultWidgetState = defaultWidgetState;

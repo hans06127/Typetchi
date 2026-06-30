@@ -26,8 +26,8 @@ function App() {
     else if (result.leveledUp) speechBubble.showMessage('levelUp', true);
     else speechBubble.showMessage('typing');
   }, [animation, expToast, speechBubble]);
-  const { petState, addTypingExp, updateTodayTypingSpeedMax } = usePetProgress(handleTypingProgress);
-  const { speedState, recordTyping } = useTypingStats({
+  const { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress } = usePetProgress(handleTypingProgress);
+  const { speedState, recordTyping, resetTypingStats } = useTypingStats({
     todayMaxCpm: petState.todayMaxCpm,
     todayMaxWpm: petState.todayMaxWpm,
     onTodayMaxChange: updateTodayTypingSpeedMax,
@@ -37,7 +37,15 @@ function App() {
     recordTyping(input.addedChars, input.timestamp);
   }, [addTypingExp, recordTyping]);
   useTypingTracker(handleValidTyping, pasteDetection.showPasteHint);
-  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} />;
+  const handleResetPetProgress = useCallback(async () => {
+    const confirmed = window.confirm('確定要重置角色進度嗎？EXP、等級與今日統計會歸零。');
+    if (!confirmed) return;
+    await resetProgress();
+    resetTypingStats();
+    speechBubble.showMessage('resetProgress', true);
+  }, [resetProgress, resetTypingStats, speechBubble]);
+
+  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} onResetPetProgress={handleResetPetProgress} />;
 }
 
 function ensureTypetchiRoot() {

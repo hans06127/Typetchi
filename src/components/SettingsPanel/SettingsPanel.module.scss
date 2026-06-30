@@ -1,0 +1,5 @@
+.panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid rgba(126,101,88,.12); background: rgba(255,249,244,.72); border-radius: 0 0 22px 22px; }
+.button { min-width: 0; padding: 8px 10px; border: 0; border-radius: 999px; background: rgba(255,255,255,.82); color: #574941; box-shadow: inset 0 0 0 1px rgba(126,101,88,.16); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.button:hover { background: #fff; }
+.danger { background: rgba(255, 231, 222, .9); color: #8a4a3d; box-shadow: inset 0 0 0 1px rgba(199, 105, 86, .22); }
+.danger:hover { background: #ffe5dc; }
