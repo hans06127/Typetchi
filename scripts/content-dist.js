@@ -91,23 +91,26 @@
   }
 
   function numberOrFallback(value, fallback) {
-    return Number.isFinite(value) ? value : fallback;
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
   }
-  function normalizeWidgetState(state) {
+  function normalizeWidgetState(rawState) {
+    const state = rawState && typeof rawState === 'object' ? rawState : {};
     const defaults = defaultWidgetState();
     const widthMax = Math.max(240, Math.min(420, window.innerWidth - 32));
     const heightMax = Math.max(280, Math.min(560, window.innerHeight - 32));
-    const width = clamp(numberOrFallback(state?.width, defaults.width), 240, widthMax);
-    const height = clamp(numberOrFallback(state?.height, defaults.height), 280, heightMax);
+    const width = clamp(numberOrFallback(state.width, defaults.width), 240, widthMax);
+    const height = clamp(numberOrFallback(state.height, defaults.height), 280, heightMax);
     return {
       ...defaults,
-      ...(state ?? {}),
-      x: clamp(numberOrFallback(state?.x, defaults.x), 8, Math.max(8, window.innerWidth - width - 8)),
-      y: clamp(numberOrFallback(state?.y, defaults.y), 8, Math.max(8, window.innerHeight - height - 8)),
+      ...state,
+      x: clamp(numberOrFallback(state.x, defaults.x), 8, Math.max(8, window.innerWidth - width - 8)),
+      y: clamp(numberOrFallback(state.y, defaults.y), 8, Math.max(8, window.innerHeight - height - 8)),
       width,
       height,
-      closed: state?.closed ?? defaults.closed,
-      updatedAt: state?.updatedAt,
+      pinned: typeof state.pinned === 'boolean' ? state.pinned : defaults.pinned,
+      collapsed: typeof state.collapsed === 'boolean' ? state.collapsed : defaults.collapsed,
+      closed: false,
+      updatedAt: numberOrFallback(state.updatedAt, 0) || undefined,
     };
   }
   function storageGet(key, fallback) {
@@ -362,7 +365,6 @@
       .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
       .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize, .typetchi-collapsed .typetchi-footer { visibility: hidden; pointer-events: none; }
       .typetchi-collapsed .typetchi-handle { display: flex; visibility: visible; }
-      .typetchi-reopen { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; box-shadow: 0 12px 28px rgba(91,68,56,.2); pointer-events: auto; }
       @keyframes typetchi-idle { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } } @keyframes typetchi-typing { 0% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-6px) rotate(-3deg); } 70% { transform: translateY(0) rotate(3deg); } 100% { transform: translateY(0) rotate(0); } } @keyframes typetchi-happy { 0%,100% { transform: scale(1); } 40% { transform: scale(1.12); } 70% { transform: scale(.96); } } @keyframes typetchi-level-up { 0% { transform: scale(1); filter: brightness(1); } 40% { transform: scale(1.18); filter: brightness(1.25); } 100% { transform: scale(1); filter: brightness(1); } } @keyframes typetchi-evolve { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 40% { transform: scale(1.25); opacity: .7; filter: brightness(1.8); } 70% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1); opacity: 1; filter: brightness(1); } } @keyframes typetchi-exp-toast { 0% { transform: translateY(6px) scale(.96); } 35% { transform: translateY(-6px) scale(1.04); } 100% { transform: translateY(-4px) scale(1); } } @media (prefers-reduced-motion: reduce) { .typetchi-widget, .typetchi-pet, .typetchi-fill, .typetchi-toast, .typetchi-bubble { animation: none !important; transition: none !important; } }
     `;
     appRoot = document.createElement('div');
@@ -392,11 +394,6 @@
   function render() {
     if (!appRoot) return;
     appRoot.replaceChildren();
-    if (widgetState.closed) {
-      appRoot.append(createButton('開啟 Typetchi', () => setWidget({ ...widgetState, closed: false })));
-      appRoot.firstElementChild.className = 'typetchi-reopen';
-      return;
-    }
     const stage = getStage(petState.totalExp);
     const nextStage = getNextStage(petState.totalExp);
     const progress = calculateStageProgress(petState.totalExp);
@@ -427,7 +424,7 @@
     controls.append(
       createButton(widgetState.pinned ? '解除固定' : '固定', () => setWidget({ ...widgetState, pinned: !widgetState.pinned })),
       createButton(widgetState.collapsed ? '展開' : '收合', toggleCollapse),
-      createButton('關閉', () => setWidget({ ...widgetState, closed: true })),
+      createButton('收合', () => setWidget({ ...widgetState, collapsed: true, closed: false })),
     );
     header.append(title, controls);
 
@@ -499,7 +496,7 @@
     appRoot.append(widget);
   }
   function setWidget(next) {
-    widgetState = next;
+    widgetState = normalizeWidgetState(next);
     scheduleWidgetFlush(widgetState);
     render();
   }

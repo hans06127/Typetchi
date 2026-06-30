@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createDefaultWidgetState } from '../../config/defaultState';
 import { getNextStage, getStage } from '../../systems/evolutionSystem';
 import { calculateStageProgress } from '../../systems/stageProgressSystem';
-import { loadWidgetState, saveWidgetState } from '../../storage/widgetStorage';
+import { loadWidgetState, normalizeWidgetState, saveWidgetState } from '../../storage/widgetStorage';
 import type { PetAnimationState, UserPetState } from '../../types/pet';
 import type { WidgetState } from '../../types/widget';
 import type { TypingSpeedState } from '../../types/typingStats';
@@ -33,7 +33,10 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
   const { scheduleFlush: scheduleWidgetFlush } = useDebouncedStorageFlush<WidgetState>(saveWidgetState, 1000);
   useEffect(() => { void loadWidgetState().then((state) => { console.log('[Typetchi] storage loaded'); setWidget(state); }); }, []);
   const applyRemoteWidgetState = useCallback((next: WidgetState) => {
-    setWidget((current) => (next.updatedAt ?? 0) >= (current.updatedAt ?? 0) ? next : current);
+    setWidget((current) => {
+      const normalizedNext = normalizeWidgetState(next);
+      return (normalizedNext.updatedAt ?? 0) >= (current.updatedAt ?? 0) ? normalizedNext : current;
+    });
   }, []);
   useEffect(() => { onWidgetStateReady?.(applyRemoteWidgetState); }, [applyRemoteWidgetState, onWidgetStateReady]);
   const updateWidget = useCallback((next: WidgetState) => { setWidget(next); scheduleWidgetFlush(next); }, [scheduleWidgetFlush]);
@@ -47,14 +50,13 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
   const stage = getStage(petState.currentStage);
   const nextStage = getNextStage(petState.totalExp);
   const stageProgress = calculateStageProgress(petState.totalExp);
-  if (widget.closed) return <button className={styles.reopen} type="button" onClick={() => updateWidget({ ...widget, closed: false })}>開啟 Typetchi</button>;
   return <section className={`${styles.widget} ${widget.collapsed ? styles.collapsed : ''}`} style={{ left: widget.x, top: widget.y, width: widget.width, height: widget.height, '--typetchi-expanded-height': `${widget.height}px` } as Record<string, string | number>}>
     <button className={styles.collapsedHandle} type="button" title="展開 Typetchi" aria-label="展開 Typetchi" onClick={toggleCollapse}>
       <PetCharacter stage={petState.currentStage} animationState={animationState} compact />
     </button>
     <header className={styles.header} onPointerDown={drag}>
       <span className={styles.title}>Typetchi</span>
-      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onClose={() => updateWidget({ ...widget, closed: true })} />
+      <WidgetControls pinned={widget.pinned} collapsed={widget.collapsed} onTogglePin={() => updateWidget({ ...widget, pinned: !widget.pinned })} onToggleCollapse={toggleCollapse} onClose={() => updateWidget({ ...widget, collapsed: true, closed: false })} />
     </header>
     <div className={styles.body}>
       <SpeechBubble message={speechBubble.message} visible={speechBubble.visible} />
