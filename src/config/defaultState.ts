@@ -7,6 +7,8 @@ export const defaultPetState = (): UserPetState => ({
   level: 1,
   currentStage: 'stage_1',
   todayTypedCount: 0,
+  todayMaxCpm: 0,
+  todayMaxWpm: 0,
   lastActiveDate: getLocalDateKey(),
 });
 

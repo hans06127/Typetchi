@@ -5,8 +5,14 @@
   const WIDGET_KEY = 'typetchi.widgetState';
   const FLUSH_DELAY_MS = 1000;
   const PET_ANIMATION_DURATION = { typing: 400, happy: 800, level_up: 1200, evolve: 1800 };
-  const PET_MESSAGES = { typing: ['正在吸收文字能量...', '今天也很努力呢', '繼續打字，我會長大！'], levelUp: ['升級了！', '變得更有精神了！'], evolve: ['進化了！', '新的樣子登場！'] };
+  const PET_MESSAGES = { typing: ['正在吸收文字能量...', '今天也很努力呢', '繼續打字，我會長大！'], levelUp: ['升級了！', '變得更有精神了！'], evolve: ['進化了！', '新的樣子登場！'], paste: ['貼上的文字不會增加經驗值', '只計算手打的文字喔'] };
   const TYPING_MESSAGE_COOLDOWN_MS = 30000;
+  const PASTE_HINT_COOLDOWN_MS = 30000;
+  const PASTE_DETECTION_WINDOW_MS = 1000;
+  const MAX_CHARS_PER_INPUT_EVENT = 20;
+  const TYPING_SESSION_IDLE_TIMEOUT = 10000;
+  const TYPING_EVENT_RETENTION_MS = 120000;
+  const TYPING_SPEED_WINDOW_MS = 60000;
   const STAGES = [
     { id: 'stage_1', name: '幼年期', requiredExp: 0, icon: '🌱' },
     { id: 'stage_2', name: '成長期', requiredExp: 500, icon: '🌿' },
@@ -16,6 +22,7 @@
   console.log('[Typetchi] content script loaded');
 
   const previousLengthMap = new WeakMap();
+  const pasteElementMap = new WeakMap();
   let isComposing = false;
   let shadowRoot;
   let appRoot;
@@ -37,6 +44,10 @@
   let speechBubble = { message: null, visible: false };
   let speechBubbleTimer;
   let lastTypingMessageAt = 0;
+  let lastPasteHintAt = 0;
+  let typingEvents = [];
+  let typingStatsActiveDate = dateKey();
+  let typingSpeedState = { recentCpm: 0, recentWpm: 0, todayMaxCpm: 0, todayMaxWpm: 0, sessionChars: 0, sessionStartedAt: null, lastTypedAt: null };
 
   function dateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -45,7 +56,7 @@
     return Math.min(Math.max(value, min), max);
   }
   function defaultPetState() {
-    return { totalExp: 0, level: 1, currentStage: 'stage_1', todayTypedCount: 0, lastActiveDate: dateKey() };
+    return { totalExp: 0, level: 1, currentStage: 'stage_1', todayTypedCount: 0, todayMaxCpm: 0, todayMaxWpm: 0, lastActiveDate: dateKey() };
   }
   function defaultWidgetState() {
     return { x: Math.max(16, window.innerWidth - 300), y: Math.max(16, window.innerHeight - 380), width: 280, height: 360, pinned: false, collapsed: false, closed: false };
@@ -207,6 +218,49 @@
     speechBubble = { message: pickMessage(kind), visible: true };
     render();
     speechBubbleTimer = window.setTimeout(() => { speechBubble = { ...speechBubble, visible: false }; render(); }, 2600);
+  }
+  function showPasteHint() {
+    const now = Date.now();
+    if (now - lastPasteHintAt < PASTE_HINT_COOLDOWN_MS) return;
+    lastPasteHintAt = now;
+    showSpeech('paste', true);
+  }
+  function markPaste(element, pastedAt) { pasteElementMap.set(element, pastedAt); }
+  function wasRecentlyPasted(element, now) { const pastedAt = pasteElementMap.get(element); return Boolean(pastedAt && now - pastedAt <= PASTE_DETECTION_WINDOW_MS); }
+  function shouldIgnoreInputForExp(element, addedChars, now) {
+    if (isComposing) return true;
+    if (addedChars <= 0) return true;
+    if (addedChars > MAX_CHARS_PER_INPUT_EVENT) return true;
+    return wasRecentlyPasted(element, now);
+  }
+  function pruneTypingEvents(events, now) { const threshold = now - TYPING_EVENT_RETENTION_MS; return events.filter((event) => event.timestamp >= threshold); }
+  function calculateCpm(events, now) { const windowStartedAt = now - TYPING_SPEED_WINDOW_MS; return events.filter((event) => event.timestamp >= windowStartedAt).reduce((sum, event) => sum + event.addedChars, 0); }
+  function calculateWpm(cpm) { return Math.round(cpm / 5); }
+  function updateTypingStats(addedChars, timestamp) {
+    const eventDate = dateKey(new Date(timestamp));
+    const isNewDay = typingStatsActiveDate !== eventDate;
+    if (isNewDay) {
+      typingStatsActiveDate = eventDate;
+      typingEvents = [];
+      typingSpeedState = { recentCpm: 0, recentWpm: 0, todayMaxCpm: 0, todayMaxWpm: 0, sessionChars: 0, sessionStartedAt: null, lastTypedAt: null };
+    }
+    typingEvents = pruneTypingEvents([...typingEvents, { timestamp, addedChars, source: 'typing' }], timestamp);
+    const recentCpm = calculateCpm(typingEvents, timestamp);
+    const recentWpm = calculateWpm(recentCpm);
+    const shouldStartNewSession = !typingSpeedState.lastTypedAt || timestamp - typingSpeedState.lastTypedAt > TYPING_SESSION_IDLE_TIMEOUT;
+    typingSpeedState = {
+      recentCpm,
+      recentWpm,
+      todayMaxCpm: Math.max(typingSpeedState.todayMaxCpm, recentCpm),
+      todayMaxWpm: Math.max(typingSpeedState.todayMaxWpm, recentWpm),
+      sessionStartedAt: shouldStartNewSession ? timestamp : typingSpeedState.sessionStartedAt,
+      lastTypedAt: timestamp,
+      sessionChars: shouldStartNewSession ? addedChars : typingSpeedState.sessionChars + addedChars,
+    };
+    if (typingSpeedState.todayMaxCpm !== (petState.todayMaxCpm ?? 0) || typingSpeedState.todayMaxWpm !== (petState.todayMaxWpm ?? 0)) {
+      petState = { ...petState, todayMaxCpm: typingSpeedState.todayMaxCpm, todayMaxWpm: typingSpeedState.todayMaxWpm };
+      schedulePetFlush(petState);
+    }
   }
   function isTrackableInput(target) {
     if (!(target instanceof HTMLElement)) return false;
@@ -400,6 +454,8 @@
       makeRow('EXP', progress.isMaxStage ? '最高階段' : progress.current + ' / ' + progress.required),
       bar,
       makeRow('今日輸入', petState.todayTypedCount + ' 字', true),
+      makeRow('目前速度', typingSpeedState.recentCpm + ' CPM / ' + typingSpeedState.recentWpm + ' WPM', true),
+      makeRow('今日最高', typingSpeedState.todayMaxCpm + ' CPM', true),
       makeRow('下一階段', nextStage?.name ?? '已成熟', true),
     );
     body.append(bubble, stageArea, stats);
@@ -426,10 +482,12 @@
   }
   function addTypingExp(addedChars) {
     const today = dateKey();
-    const todayTypedCount = petState.lastActiveDate === today ? petState.todayTypedCount : 0;
+    const isSameDay = petState.lastActiveDate === today;
+    const todayTypedCount = isSameDay ? petState.todayTypedCount : 0;
+    if (!isSameDay) typingSpeedState = { recentCpm: 0, recentWpm: 0, todayMaxCpm: 0, todayMaxWpm: 0, sessionChars: 0, sessionStartedAt: null, lastTypedAt: null };
     const previous = petState;
     const totalExp = petState.totalExp + addedChars;
-    petState = { ...petState, totalExp, level: calculateLevel(totalExp), currentStage: calculateStage(totalExp), todayTypedCount: todayTypedCount + addedChars, lastActiveDate: today };
+    petState = { ...petState, totalExp, level: calculateLevel(totalExp), currentStage: calculateStage(totalExp), todayTypedCount: todayTypedCount + addedChars, todayMaxCpm: isSameDay ? (petState.todayMaxCpm ?? 0) : 0, todayMaxWpm: isSameDay ? (petState.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
     const evolved = previous.currentStage !== petState.currentStage;
     const leveledUp = previous.level < petState.level;
     playAnimation(evolved ? 'evolve' : leveledUp ? 'level_up' : 'happy');
@@ -462,18 +520,28 @@
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
   }
-  function handleInput(event) {
-    if (isComposing) return;
+  function handlePaste(event) {
     if (!isTrackableInput(event.target)) return;
-    const addedChars = calculateAddedChars(event.target);
-    if (addedChars > 0) {
-      console.log('[Typetchi] typing tracked', { addedChars });
-      addTypingExp(addedChars);
+    markPaste(event.target, Date.now());
+    showPasteHint();
+  }
+  function handleInput(event) {
+    if (!isTrackableInput(event.target)) return;
+    const element = event.target;
+    const addedChars = calculateAddedChars(element);
+    const timestamp = Date.now();
+    if (shouldIgnoreInputForExp(element, addedChars, timestamp)) {
+      if (addedChars > 0) console.log('[Typetchi] typing ignored for EXP', { addedChars });
+      return;
     }
+    console.log('[Typetchi] typing tracked', { addedChars });
+    addTypingExp(addedChars);
+    updateTypingStats(addedChars, timestamp);
   }
   function attachGlobalListeners() {
     document.addEventListener('compositionstart', () => { isComposing = true; }, true);
     document.addEventListener('compositionend', () => { isComposing = false; }, true);
+    document.addEventListener('paste', handlePaste, true);
     document.addEventListener('input', handleInput, true);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAllStorage(); });
     window.addEventListener('beforeunload', flushAllStorage);
@@ -481,7 +549,8 @@
   function loadStorageAndRender() {
     Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState())]).then(([storedPet, storedWidget]) => {
       const today = dateKey();
-      petState = { ...storedPet, level: calculateLevel(storedPet.totalExp), currentStage: calculateStage(storedPet.totalExp), todayTypedCount: storedPet.lastActiveDate === today ? storedPet.todayTypedCount : 0, lastActiveDate: today };
+      petState = { ...storedPet, level: calculateLevel(storedPet.totalExp), currentStage: calculateStage(storedPet.totalExp), todayTypedCount: storedPet.lastActiveDate === today ? storedPet.todayTypedCount : 0, todayMaxCpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxCpm ?? 0) : 0, todayMaxWpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
+      typingSpeedState = { ...typingSpeedState, todayMaxCpm: petState.todayMaxCpm, todayMaxWpm: petState.todayMaxWpm };
       widgetState = normalizeWidgetState(storedWidget);
       console.log('[Typetchi] storage loaded');
       schedulePetFlush(petState);

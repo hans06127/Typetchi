@@ -6,7 +6,8 @@ export function calculateExpFromTyping(addedChars: number): number { return Math
 export function calculateLevel(totalExp: number): number { return Math.floor(totalExp / 100) + 1; }
 export function applyTypingExp(state: UserPetState, addedChars: number): UserPetState {
   const today = getLocalDateKey();
-  const todayTypedCount = state.lastActiveDate === today ? state.todayTypedCount : 0;
+  const isSameDay = state.lastActiveDate === today;
+  const todayTypedCount = isSameDay ? state.todayTypedCount : 0;
   const gainedExp = calculateExpFromTyping(addedChars);
   const nextTotalExp = state.totalExp + gainedExp;
   return {
@@ -15,6 +16,8 @@ export function applyTypingExp(state: UserPetState, addedChars: number): UserPet
     level: calculateLevel(nextTotalExp),
     currentStage: calculateStage(nextTotalExp),
     todayTypedCount: todayTypedCount + addedChars,
+    todayMaxCpm: isSameDay ? (state.todayMaxCpm ?? 0) : 0,
+    todayMaxWpm: isSameDay ? (state.todayMaxWpm ?? 0) : 0,
     lastActiveDate: today,
   };
 }

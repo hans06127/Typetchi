@@ -5,6 +5,7 @@ import { calculateStageProgress } from '../../systems/stageProgressSystem';
 import { loadWidgetState, saveWidgetState } from '../../storage/widgetStorage';
 import type { PetAnimationState, UserPetState } from '../../types/pet';
 import type { WidgetState } from '../../types/widget';
+import type { TypingSpeedState } from '../../types/typingStats';
 import { ExpBar } from '../ExpBar/ExpBar';
 import { ExpGainToast } from '../ExpGainToast/ExpGainToast';
 import { PetCharacter } from '../PetCharacter/PetCharacter';
@@ -20,9 +21,10 @@ interface PetWidgetProps {
   animationState: PetAnimationState;
   expToast: { amount: number; visible: boolean };
   speechBubble: { message: string | null; visible: boolean };
+  speedState: TypingSpeedState;
 }
 
-export function PetWidget({ petState, animationState, expToast, speechBubble }: PetWidgetProps) {
+export function PetWidget({ petState, animationState, expToast, speechBubble, speedState }: PetWidgetProps) {
   const [widget, setWidget] = useState<WidgetState>(defaultWidgetState());
   const { scheduleFlush: scheduleWidgetFlush } = useDebouncedStorageFlush<WidgetState>(saveWidgetState, 1000);
   useEffect(() => { void loadWidgetState().then((state) => { console.log('[Typetchi] storage loaded'); setWidget(state); }); }, []);
@@ -54,6 +56,8 @@ export function PetWidget({ petState, animationState, expToast, speechBubble }: 
         <div className={styles.row}><span>EXP</span><span>{stageProgress.isMaxStage ? '最高階段' : `${stageProgress.current} / ${stageProgress.required}`}</span></div>
         <ExpBar value={stageProgress.current} max={stageProgress.required} percentage={stageProgress.percentage} />
         <div className={styles.row}><span className={styles.muted}>今日輸入</span><span>{petState.todayTypedCount} 字</span></div>
+        <div className={styles.row}><span className={styles.muted}>目前速度</span><span>{speedState.recentCpm} CPM / {speedState.recentWpm} WPM</span></div>
+        <div className={styles.row}><span className={styles.muted}>今日最高</span><span>{speedState.todayMaxCpm} CPM</span></div>
         <div className={styles.row}><span className={styles.muted}>下一階段</span><span>{nextStage?.name ?? '已成熟'}</span></div>
       </div>
     </div>

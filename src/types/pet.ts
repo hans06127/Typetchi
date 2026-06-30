@@ -6,6 +6,8 @@ export interface UserPetState {
   level: number;
   currentStage: PetStageId;
   todayTypedCount: number;
+  todayMaxCpm: number;
+  todayMaxWpm: number;
   lastActiveDate: string;
 }
 

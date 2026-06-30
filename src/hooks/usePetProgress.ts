@@ -24,6 +24,14 @@ export function usePetProgress(onTypingProgress?: (result: TypingProgressResult)
     });
   }, [scheduleFlush]);
 
+  const updateTodayTypingSpeedMax = useCallback((max: { todayMaxCpm: number; todayMaxWpm: number }) => {
+    setPetState((current) => {
+      const next = { ...current, todayMaxCpm: max.todayMaxCpm, todayMaxWpm: max.todayMaxWpm };
+      scheduleFlush(next);
+      return next;
+    });
+  }, [scheduleFlush]);
+
   const addTypingExp = useCallback((addedChars: number) => {
     setPetState((current) => {
       const next = applyTypingExp(current, addedChars);
@@ -37,5 +45,5 @@ export function usePetProgress(onTypingProgress?: (result: TypingProgressResult)
     });
   }, [onTypingProgress, scheduleFlush]);
 
-  return { petState, addTypingExp, flushNow };
+  return { petState, addTypingExp, updateTodayTypingSpeedMax, flushNow };
 }
