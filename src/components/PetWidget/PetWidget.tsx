@@ -39,7 +39,11 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
     });
   }, []);
   useEffect(() => { onWidgetStateReady?.(applyRemoteWidgetState); }, [applyRemoteWidgetState, onWidgetStateReady]);
-  const updateWidget = useCallback((next: WidgetState) => { setWidget(next); scheduleWidgetFlush(next); }, [scheduleWidgetFlush]);
+  const updateWidget = useCallback((next: WidgetState) => {
+    const normalizedNext = normalizeWidgetState(next);
+    setWidget(normalizedNext);
+    scheduleWidgetFlush(normalizedNext);
+  }, [scheduleWidgetFlush]);
   const closeWidget = useCallback(() => {
     console.log('[Typetchi] widget closed');
     updateWidget({ ...widget, collapsed: false, closed: true });
