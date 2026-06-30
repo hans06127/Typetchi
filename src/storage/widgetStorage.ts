@@ -29,7 +29,7 @@ export function normalizeWidgetState(rawState: unknown): WidgetState {
     height,
     pinned: typeof state.pinned === 'boolean' ? state.pinned : defaults.pinned,
     collapsed: typeof state.collapsed === 'boolean' ? state.collapsed : defaults.collapsed,
-    closed: false,
+    closed: typeof state.closed === 'boolean' ? state.closed : defaults.closed,
     updatedAt: numberOrFallback(state.updatedAt, defaults.updatedAt ?? 0) || undefined,
   };
 }

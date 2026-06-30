@@ -52,6 +52,7 @@
   let typingEvents = [];
   let typingStatsActiveDate = dateKey();
   let typingSpeedState = { recentCpm: 0, recentWpm: 0, todayMaxCpm: 0, todayMaxWpm: 0, sessionChars: 0, sessionStartedAt: null, lastTypedAt: null };
+  let collapsedHandleMoved = false;
 
   function dateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -110,7 +111,7 @@
       height,
       pinned: typeof state.pinned === 'boolean' ? state.pinned : defaults.pinned,
       collapsed: typeof state.collapsed === 'boolean' ? state.collapsed : defaults.collapsed,
-      closed: false,
+      closed: typeof state.closed === 'boolean' ? state.closed : defaults.closed,
       updatedAt: numberOrFallback(state.updatedAt, 0) || undefined,
     };
   }
@@ -384,9 +385,6 @@
       .typetchi-resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; pointer-events: auto; }
       .typetchi-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
       .typetchi-handle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); transform: translateX(-50%); box-shadow: 0 8px 22px rgba(91,68,56,.18); pointer-events: auto; } .typetchi-handle:hover::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; } .typetchi-handle .typetchi-pet { width: 32px; height: 32px; }
-      .typetchi-closed { width: 64px !important; height: 64px !important; min-width: 64px; min-height: 64px; background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
-      .typetchi-closed .typetchi-header, .typetchi-closed .typetchi-body, .typetchi-closed .typetchi-resize, .typetchi-closed .typetchi-footer { visibility: hidden; pointer-events: none; }
-      .typetchi-closed .typetchi-handle { top: 10px; display: flex; visibility: visible; }
       .typetchi-collapsed { transform: translateY(calc(100% - 48px)) scale(.96); background: transparent; border-color: transparent; box-shadow: none; pointer-events: none; }
       .typetchi-collapsed .typetchi-header, .typetchi-collapsed .typetchi-body, .typetchi-collapsed .typetchi-resize, .typetchi-collapsed .typetchi-footer { visibility: hidden; pointer-events: none; }
       .typetchi-collapsed .typetchi-handle { display: flex; visibility: visible; }
@@ -419,13 +417,14 @@
   function render() {
     if (!appRoot) return;
     appRoot.replaceChildren();
+    if (widgetState.closed) return;
     const stage = getStage(petState.totalExp);
     const nextStage = getNextStage(petState.totalExp);
     const progress = calculateStageProgress(petState.totalExp);
     const percent = progress.percentage;
 
     const widget = document.createElement('section');
-    widget.className = 'typetchi-widget' + (widgetState.collapsed ? ' typetchi-collapsed' : '') + (widgetState.closed ? ' typetchi-closed' : '');
+    widget.className = 'typetchi-widget' + (widgetState.collapsed ? ' typetchi-collapsed' : '');
     widget.style.left = widgetState.x + 'px';
     widget.style.top = widgetState.y + 'px';
     widget.style.width = widgetState.width + 'px';
@@ -434,9 +433,18 @@
     const handle = document.createElement('button');
     handle.type = 'button';
     handle.className = 'typetchi-handle';
-    handle.title = widgetState.closed ? '開啟 Typetchi' : '展開 Typetchi';
-    handle.setAttribute('aria-label', widgetState.closed ? '開啟 Typetchi' : '展開 Typetchi');
-    handle.addEventListener('click', widgetState.closed ? reopenWidget : toggleCollapse);
+    handle.title = '展開 Typetchi';
+    handle.setAttribute('aria-label', '展開 Typetchi');
+    handle.addEventListener('pointerdown', startCollapsedHandleDrag);
+    handle.addEventListener('click', (event) => {
+      if (collapsedHandleMoved) {
+        event.preventDefault();
+        event.stopPropagation();
+        collapsedHandleMoved = false;
+        return;
+      }
+      toggleCollapse();
+    });
     handle.append(createPetElement(stage.id, true));
 
     const header = document.createElement('header');
@@ -527,18 +535,13 @@
   }
   function closeWidget() {
     console.log('[Typetchi] widget closed');
-    widgetState = { ...widgetState, collapsed: false, closed: true };
-    render();
-  }
-  function reopenWidget() {
-    widgetState = { ...widgetState, collapsed: false, closed: false };
-    render();
+    setWidget({ ...widgetState, collapsed: false, closed: true });
   }
 
   function toggleCollapse() {
     const collapsed = !widgetState.collapsed;
     console.log(collapsed ? '[Typetchi] widget collapsed' : '[Typetchi] widget expanded');
-    setWidget({ ...widgetState, collapsed });
+    setWidget({ ...widgetState, collapsed, closed: false });
   }
   function addTypingExp(addedChars) {
     const today = dateKey();
@@ -567,6 +570,21 @@
     const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); flushWidgetState(); };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
+  }
+
+  function startCollapsedHandleDrag(event) {
+    const start = { x: event.clientX, y: event.clientY };
+    collapsedHandleMoved = false;
+    const onMove = (moveEvent) => {
+      if (Math.abs(moveEvent.clientX - start.x) > 4 || Math.abs(moveEvent.clientY - start.y) > 4) collapsedHandleMoved = true;
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    startDrag(event);
   }
   function startResize(event) {
     if (widgetState.pinned) return;
