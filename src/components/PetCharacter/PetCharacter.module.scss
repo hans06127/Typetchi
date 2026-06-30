@@ -1,7 +1,30 @@
-.stage { display: grid; place-items: center; min-height: 112px; }
-.pet { width: 96px; height: 96px; border-radius: 48% 52% 45% 55%; display: grid; place-items: center; font-size: 42px; box-shadow: inset -10px -14px 22px rgba(116, 80, 70, .12); animation: float 2.8s ease-in-out infinite; }
-.stage_1 { background: #ffd7df; }
-.stage_2 { background: #c7f2dd; transform: scale(1.08); }
-.stage_3 { background: #d8d0ff; transform: scale(1.16); }
-.name { margin-top: 8px; color: #6b5a52; font-weight: 700; text-align: center; }
-@keyframes float { 0%,100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+.wrap { display: grid; place-items: center; min-height: 104px; }
+.compact { min-height: 0; }
+.pet { position: relative; width: 82px; height: 82px; transform-origin: center bottom; }
+.compact .pet { width: 32px; height: 32px; }
+.petBody { position: absolute; inset: 10px; border-radius: 48% 52% 45% 55%; background: linear-gradient(145deg, #ffd6dc, #ffb7c7); box-shadow: inset -8px -10px 18px rgba(173, 82, 104, .13), 0 12px 24px rgba(153, 96, 96, .2); }
+.petFace { position: absolute; left: 28px; right: 28px; top: 39px; display: flex; justify-content: space-between; }
+.eye { width: 7px; height: 9px; border-radius: 999px; background: #58423c; box-shadow: 0 1px 0 rgba(255,255,255,.7); }
+.earLeft, .earRight, .armLeft, .armRight { position: absolute; background: #ffc4d0; }
+.earLeft, .earRight { top: 6px; width: 20px; height: 28px; border-radius: 999px 999px 12px 12px; z-index: -1; }
+.earLeft { left: 16px; transform: rotate(-24deg); }
+.earRight { right: 16px; transform: rotate(24deg); }
+.armLeft, .armRight { top: 50px; width: 18px; height: 11px; border-radius: 999px; }
+.armLeft { left: 2px; transform: rotate(-18deg); }
+.armRight { right: 2px; transform: rotate(18deg); }
+.pet--stage_1 .petBody { border-radius: 56% 44% 52% 48%; background: linear-gradient(145deg, #d8f6c5, #aee7bc); }
+.pet--stage_2 .petBody { background: linear-gradient(145deg, #c7f0ff, #9bd8ff); }
+.pet--stage_2 .earLeft, .pet--stage_2 .earRight { background: #afe2ff; }
+.pet--stage_3 .petBody { background: linear-gradient(145deg, #ffe3a8, #ffb9c9); }
+.pet--stage_3 .earLeft, .pet--stage_3 .earRight, .pet--stage_3 .armLeft, .pet--stage_3 .armRight { background: #ffc1ca; }
+.pet--idle { animation: typetchi-idle 2.4s ease-in-out infinite; }
+.pet--typing { animation: typetchi-typing .4s ease-in-out; }
+.pet--happy { animation: typetchi-happy .8s ease-in-out; }
+.pet--level_up { animation: typetchi-level-up 1.2s ease-in-out; }
+.pet--evolve { animation: typetchi-evolve 1.8s ease-in-out; }
+@keyframes typetchi-idle { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.02); } }
+@keyframes typetchi-typing { 0% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-6px) rotate(-3deg); } 70% { transform: translateY(0) rotate(3deg); } 100% { transform: translateY(0) rotate(0); } }
+@keyframes typetchi-happy { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.12); } 70% { transform: scale(.96); } }
+@keyframes typetchi-level-up { 0% { transform: scale(1); filter: brightness(1); } 40% { transform: scale(1.18); filter: brightness(1.25); } 100% { transform: scale(1); filter: brightness(1); } }
+@keyframes typetchi-evolve { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 40% { transform: scale(1.25); opacity: .7; filter: brightness(1.8); } 70% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1); opacity: 1; filter: brightness(1); } }
+@media (prefers-reduced-motion: reduce) { .pet { animation: none !important; transition: none !important; } }

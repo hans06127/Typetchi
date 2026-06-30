@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PetWidget } from '../components/PetWidget/PetWidget';
-import { usePetProgress } from '../hooks/usePetProgress';
-import { useTypingTracker } from '../hooks/useTypingTracker';
+import { useExpGainToast } from '../hooks/useExpGainToast';
+import { usePasteDetection } from '../hooks/usePasteDetection';
+import { usePetAnimation } from '../hooks/usePetAnimation';
+import { usePetProgress, type TypingProgressResult } from '../hooks/usePetProgress';
+import { useSpeechBubble } from '../hooks/useSpeechBubble';
+import { useTypingStats } from '../hooks/useTypingStats';
+import { useTypingTracker, type ValidTypingInput } from '../hooks/useTypingTracker';
 import { hasTypetchiRoot, injectTypetchiRoot, ROOT_ID } from './injectRoot';
 
 let isMounting = false;
@@ -10,9 +15,29 @@ let ensureRootTimer: number | undefined;
 let rootRemovalObserver: MutationObserver | undefined;
 
 function App() {
-  const { petState, addTypingExp } = usePetProgress();
-  useTypingTracker(addTypingExp);
-  return <PetWidget petState={petState} />;
+  const animation = usePetAnimation();
+  const expToast = useExpGainToast();
+  const speechBubble = useSpeechBubble();
+  const pasteDetection = usePasteDetection(() => speechBubble.showMessage('paste'));
+  const handleTypingProgress = useCallback((result: TypingProgressResult) => {
+    animation.playAnimation(result.animationState);
+    expToast.showExpGain(result.gainedExp);
+    if (result.evolved) speechBubble.showMessage('evolve', true);
+    else if (result.leveledUp) speechBubble.showMessage('levelUp', true);
+    else speechBubble.showMessage('typing');
+  }, [animation, expToast, speechBubble]);
+  const { petState, addTypingExp, updateTodayTypingSpeedMax } = usePetProgress(handleTypingProgress);
+  const { speedState, recordTyping } = useTypingStats({
+    todayMaxCpm: petState.todayMaxCpm,
+    todayMaxWpm: petState.todayMaxWpm,
+    onTodayMaxChange: updateTodayTypingSpeedMax,
+  });
+  const handleValidTyping = useCallback((input: ValidTypingInput) => {
+    addTypingExp(input.addedChars);
+    recordTyping(input.addedChars, input.timestamp);
+  }, [addTypingExp, recordTyping]);
+  useTypingTracker(handleValidTyping, pasteDetection.showPasteHint);
+  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} />;
 }
 
 function ensureTypetchiRoot() {
