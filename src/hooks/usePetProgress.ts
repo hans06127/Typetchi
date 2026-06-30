@@ -13,6 +13,10 @@ export interface TypingProgressResult {
   evolved: boolean;
 }
 
+function isNewerOrSameRemote(next: UserPetState, current: UserPetState): boolean {
+  return (next.updatedAt ?? 0) >= (current.updatedAt ?? 0);
+}
+
 export function usePetProgress(onTypingProgress?: (result: TypingProgressResult) => void) {
   const [petState, setPetState] = useState<UserPetState>(defaultPetState());
   const { scheduleFlush, flushNow } = useDebouncedStorageFlush<UserPetState>(savePetState, 1000);
@@ -21,9 +25,15 @@ export function usePetProgress(onTypingProgress?: (result: TypingProgressResult)
     void loadPetState().then((state) => {
       console.log('[Typetchi] storage loaded');
       setPetState(state);
-      scheduleFlush(state);
     });
-  }, [scheduleFlush]);
+  }, []);
+
+  const applyRemotePetState = useCallback((next: UserPetState) => {
+    setPetState((current) => {
+      if (!isNewerOrSameRemote(next, current)) return current;
+      return next;
+    });
+  }, []);
 
   const updateTodayTypingSpeedMax = useCallback((max: { todayMaxCpm: number; todayMaxWpm: number }) => {
     setPetState((current) => {
@@ -52,5 +62,5 @@ export function usePetProgress(onTypingProgress?: (result: TypingProgressResult)
     return next;
   }, []);
 
-  return { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress, flushNow };
+  return { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress, flushNow, applyRemotePetState };
 }

@@ -3,6 +3,8 @@
   const APP_ID = 'typetchi-app';
   const PET_KEY = 'typetchi.petState';
   const WIDGET_KEY = 'typetchi.widgetState';
+  const SETTINGS_KEY = 'typetchi.settings';
+  const TYPING_STATS_KEY = 'typetchi.typingStats';
   const FLUSH_DELAY_MS = 1000;
   const PET_ANIMATION_DURATION = { typing: 400, happy: 800, level_up: 1200, evolve: 1800 };
   const PET_MESSAGES = { typing: ['正在吸收文字能量...', '今天也很努力呢', '繼續打字，我會長大！'], levelUp: ['升級了！', '變得更有精神了！'], evolve: ['進化了！', '新的樣子登場！'], paste: ['貼上的文字不會增加經驗值', '只計算手打的文字喔'], resetWidget: ['視窗位置已重置'], resetProgress: ['角色進度已重置'] };
@@ -32,6 +34,7 @@
   let widgetFlushTimer;
   let pendingPetState = null;
   let pendingWidgetState = null;
+  let isApplyingRemoteUpdate = false;
   let isMounting = false;
   let ensureRootTimer;
   let rootRemovalObserver;
@@ -103,7 +106,8 @@
       y: clamp(numberOrFallback(state?.y, defaults.y), 8, Math.max(8, window.innerHeight - height - 8)),
       width,
       height,
-      closed: false,
+      closed: state?.closed ?? defaults.closed,
+      updatedAt: state?.updatedAt,
     };
   }
   function storageGet(key, fallback) {
@@ -148,7 +152,7 @@
     if (!pendingPetState) return;
     const state = pendingPetState;
     pendingPetState = null;
-    storageSet(PET_KEY, state).then(() => console.log('[Typetchi] storage flushed'));
+    storageSet(PET_KEY, { ...state, updatedAt: Date.now() }).then(() => console.log('[Typetchi] storage flushed'));
   }
   function flushWidgetState() {
     if (widgetFlushTimer) window.clearTimeout(widgetFlushTimer);
@@ -156,27 +160,22 @@
     if (!pendingWidgetState) return;
     const state = pendingWidgetState;
     pendingWidgetState = null;
-    storageSet(WIDGET_KEY, state).then(() => console.log('[Typetchi] storage flushed'));
+    storageSet(WIDGET_KEY, { ...state, updatedAt: Date.now() }).then(() => console.log('[Typetchi] storage flushed'));
   }
   function schedulePetFlush(state) {
+    if (isApplyingRemoteUpdate) return;
     pendingPetState = state;
     if (petFlushTimer) window.clearTimeout(petFlushTimer);
     petFlushTimer = window.setTimeout(flushPetState, FLUSH_DELAY_MS);
   }
   function scheduleWidgetFlush(state) {
+    if (isApplyingRemoteUpdate) return;
     pendingWidgetState = normalizeWidgetState(state);
     if (widgetFlushTimer) window.clearTimeout(widgetFlushTimer);
     widgetFlushTimer = window.setTimeout(flushWidgetState, FLUSH_DELAY_MS);
   }
-  function resetWidgetPosition() {
-    widgetState = normalizeWidgetState(defaultWidgetState());
-    pendingWidgetState = widgetState;
-    flushWidgetState();
-    showSpeech('resetWidget', true);
-    render();
-  }
   function resetPetProgress() {
-    if (!window.confirm('確定要重置角色進度嗎？EXP、等級與今日統計會歸零。')) return;
+    if (!window.confirm('確定要重置角色進度嗎？EXP、等級、今日統計會歸零。')) return;
     petState = defaultPetState();
     typingEvents = [];
     typingStatsActiveDate = dateKey();
@@ -353,7 +352,7 @@
       .typetchi-toast { position: absolute; right: 16px; bottom: 92px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: rgba(255,238,170,.96); color: #765022; font-size: 12px; font-weight: 800; opacity: 0; pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; } .typetchi-toast.visible { opacity: 1; animation: typetchi-exp-toast 1s ease-out; }
       .typetchi-pet.idle { animation: typetchi-idle 2.4s ease-in-out infinite; } .typetchi-pet.typing { animation: typetchi-typing .4s ease-in-out; } .typetchi-pet.happy { animation: typetchi-happy .8s ease-in-out; } .typetchi-pet.level_up { animation: typetchi-level-up 1.2s ease-in-out; } .typetchi-pet.evolve { animation: typetchi-evolve 1.8s ease-in-out; }
       .typetchi-stats { display: grid; gap: 7px; font-size: 13px; }
-      .typetchi-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; } .typetchi-row span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; } .typetchi-stats-panel { display: grid; gap: 7px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.46); } .typetchi-footer { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid rgba(126,101,88,.12); background: rgba(255,249,244,.72); border-radius: 0 0 22px 22px; } .typetchi-footer button { min-width: 0; padding: 8px 10px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .typetchi-footer .danger { background: rgba(255,231,222,.9); color: #8a4a3d; }
+      .typetchi-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; } .typetchi-row span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; } .typetchi-stats-panel { display: grid; gap: 7px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.46); } .typetchi-footer { flex: 0 0 auto; display: grid; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid rgba(126,101,88,.12); background: rgba(255,249,244,.58); border-radius: 0 0 22px 22px; } .typetchi-footer-label { color: #9a897f; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; } .typetchi-footer .subtle-danger { justify-self: start; padding: 4px 8px; color: #8a5b50; background: transparent; box-shadow: none; text-decoration: underline; text-decoration-color: rgba(138,91,80,.32); text-underline-offset: 3px; }
       .typetchi-muted { color: #8a786e; }
       .typetchi-bar { height: 10px; background: rgba(95,78,65,.14); border-radius: 999px; overflow: hidden; }
       .typetchi-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffb7c5, #ffd88a, #9ee7c6); transition: width 220ms ease; }
@@ -428,7 +427,7 @@
     controls.append(
       createButton(widgetState.pinned ? '解除固定' : '固定', () => setWidget({ ...widgetState, pinned: !widgetState.pinned })),
       createButton(widgetState.collapsed ? '展開' : '收合', toggleCollapse),
-      createButton('關閉', () => { widgetState = { ...widgetState, closed: true }; render(); }),
+      createButton('關閉', () => setWidget({ ...widgetState, closed: true })),
     );
     header.append(title, controls);
 
@@ -483,10 +482,12 @@
     body.append(bubble, stageArea, stats);
     const footer = document.createElement('footer');
     footer.className = 'typetchi-footer';
-    const resetWidgetButton = createButton('重置視窗位置', resetWidgetPosition);
+    const footerLabel = document.createElement('div');
+    footerLabel.className = 'typetchi-footer-label';
+    footerLabel.textContent = 'Advanced';
     const resetPetButton = createButton('重置角色進度', resetPetProgress);
-    resetPetButton.className = 'danger';
-    footer.append(resetWidgetButton, resetPetButton);
+    resetPetButton.className = 'subtle-danger';
+    footer.append(footerLabel, resetPetButton);
     const resize = document.createElement('span');
     resize.className = 'typetchi-resize';
     header.addEventListener('pointerdown', startDrag);
@@ -566,6 +567,32 @@
     addTypingExp(addedChars);
     updateTypingStats(addedChars, timestamp);
   }
+
+  function applyRemoteState(callback) {
+    isApplyingRemoteUpdate = true;
+    callback();
+    queueMicrotask(() => { isApplyingRemoteUpdate = false; });
+  }
+  function attachStorageSyncListener() {
+    if (!globalThis.chrome?.storage?.onChanged) return;
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== 'local') return;
+      const petChange = changes[PET_KEY];
+      if (petChange?.newValue && (petChange.newValue.updatedAt ?? 0) >= (petState.updatedAt ?? 0)) {
+        applyRemoteState(() => {
+          const today = dateKey();
+          const remotePet = petChange.newValue;
+          petState = { ...remotePet, level: calculateLevel(remotePet.totalExp), currentStage: calculateStage(remotePet.totalExp), todayTypedCount: remotePet.lastActiveDate === today ? remotePet.todayTypedCount : 0, todayMaxCpm: remotePet.lastActiveDate === today ? (remotePet.todayMaxCpm ?? 0) : 0, todayMaxWpm: remotePet.lastActiveDate === today ? (remotePet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
+          typingSpeedState = { ...typingSpeedState, todayMaxCpm: petState.todayMaxCpm, todayMaxWpm: petState.todayMaxWpm };
+          render();
+        });
+      }
+      const widgetChange = changes[WIDGET_KEY];
+      if (widgetChange?.newValue && (widgetChange.newValue.updatedAt ?? 0) >= (widgetState.updatedAt ?? 0)) {
+        applyRemoteState(() => { widgetState = normalizeWidgetState(widgetChange.newValue); render(); });
+      }
+    });
+  }
   function attachGlobalListeners() {
     document.addEventListener('compositionstart', () => { isComposing = true; }, true);
     document.addEventListener('compositionend', () => { isComposing = false; }, true);
@@ -581,7 +608,6 @@
       typingSpeedState = { ...typingSpeedState, todayMaxCpm: petState.todayMaxCpm, todayMaxWpm: petState.todayMaxWpm };
       widgetState = normalizeWidgetState(storedWidget);
       console.log('[Typetchi] storage loaded');
-      schedulePetFlush(petState);
       render();
     });
   }
@@ -625,6 +651,7 @@
     ensureTypetchiRoot();
     observeRootRemoval();
     attachGlobalListeners();
+    attachStorageSyncListener();
     loadStorageAndRender();
     window.setTimeout(() => { console.log('[Typetchi] delayed ensure root 1000ms'); ensureTypetchiRoot(); }, 1000);
     window.setTimeout(() => { console.log('[Typetchi] delayed ensure root 3000ms'); ensureTypetchiRoot(); }, 3000);

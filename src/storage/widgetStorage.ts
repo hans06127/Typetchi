@@ -22,14 +22,15 @@ function normalizeWidgetState(state: WidgetState): WidgetState {
     y: clamp(numberOrFallback(state.y, defaults.y), 8, Math.max(8, window.innerHeight - height - 8)),
     width,
     height,
-    closed: false,
+    closed: state.closed ?? defaults.closed,
+    updatedAt: state.updatedAt,
   };
 }
 
 export async function loadWidgetState(): Promise<WidgetState> {
-  return normalizeWidgetState(await getStorageValue<WidgetState>(STORAGE_KEYS.widget, defaultWidgetState()));
+  return normalizeWidgetState(await getStorageValue<WidgetState>(STORAGE_KEYS.WIDGET_STATE, defaultWidgetState()));
 }
 
 export function saveWidgetState(state: WidgetState): Promise<void> {
-  return setStorageValue(STORAGE_KEYS.widget, normalizeWidgetState(state));
+  return setStorageValue(STORAGE_KEYS.WIDGET_STATE, { ...normalizeWidgetState(state), updatedAt: Date.now() });
 }

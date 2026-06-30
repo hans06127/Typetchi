@@ -9,6 +9,7 @@ export interface UserPetState {
   todayMaxCpm: number;
   todayMaxWpm: number;
   lastActiveDate: string;
+  updatedAt?: number;
 }
 
 export interface EvolutionStage {

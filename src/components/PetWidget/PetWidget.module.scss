@@ -21,3 +21,4 @@
 .collapsed .collapsedHandle { display: flex; visibility: visible; }
 .collapsed [class*='toast'] { right: 50%; bottom: 52px; transform: translateX(50%); }
 @media (prefers-reduced-motion: reduce) { .widget, .collapsedHandle, .collapsedHandle::after { animation: none !important; transition: none !important; } }
+.reopen { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; padding: 8px 12px; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); color: #574941; box-shadow: 0 12px 28px rgba(91,68,56,.2); font-size: 12px; font-weight: 800; cursor: pointer; pointer-events: auto; }

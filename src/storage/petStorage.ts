@@ -7,7 +7,7 @@ import { getStorageValue, setStorageValue } from './extensionStorage';
 import { STORAGE_KEYS } from './storageKeys';
 
 export async function loadPetState(): Promise<UserPetState> {
-  const state = await getStorageValue(STORAGE_KEYS.pet, defaultPetState());
+  const state = await getStorageValue(STORAGE_KEYS.PET_STATE, defaultPetState());
   const today = getLocalDateKey();
   return {
     ...state,
@@ -19,4 +19,4 @@ export async function loadPetState(): Promise<UserPetState> {
     lastActiveDate: today,
   };
 }
-export const savePetState = (state: UserPetState) => setStorageValue(STORAGE_KEYS.pet, state);
+export const savePetState = (state: UserPetState) => setStorageValue(STORAGE_KEYS.PET_STATE, { ...state, updatedAt: Date.now() });

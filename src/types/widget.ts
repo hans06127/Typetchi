@@ -6,4 +6,5 @@ export interface WidgetState {
   pinned: boolean;
   collapsed: boolean;
   closed: boolean;
+  updatedAt?: number;
 }
