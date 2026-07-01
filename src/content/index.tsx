@@ -1,6 +1,9 @@
 import React, { useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PetWidget } from '../components/PetWidget/PetWidget';
+import { TYPING_SESSION_IDLE_TIMEOUT } from '../systems/typingStatsSystem';
+import { getLocalDateKey } from '../utils/date';
+import { useDailyMissions } from '../hooks/useDailyMissions';
 import { useExpGainToast } from '../hooks/useExpGainToast';
 import { usePasteDetection } from '../hooks/usePasteDetection';
 import { usePetAnimation } from '../hooks/usePetAnimation';
@@ -21,6 +24,7 @@ function App() {
   const expToast = useExpGainToast();
   const speechBubble = useSpeechBubble();
   const pasteDetection = usePasteDetection(() => speechBubble.showMessage('paste'));
+  const sessionRef = useRef({ dateKey: '', count: 0, lastTypedAt: 0 });
   const handleTypingProgress = useCallback((result: TypingProgressResult) => {
     animation.playAnimation(result.animationState);
     expToast.showExpGain(result.gainedExp);
@@ -28,7 +32,7 @@ function App() {
     else if (result.leveledUp) speechBubble.showMessage('levelUp', true);
     else speechBubble.showMessage('typing');
   }, [animation, expToast, speechBubble]);
-  const { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress, applyRemotePetState } = usePetProgress(handleTypingProgress);
+  const { petState, addTypingExp, addBonusExp, updateTodayTypingSpeedMax, resetProgress, applyRemotePetState } = usePetProgress(handleTypingProgress);
   const applyRemoteWidgetStateRef = useRef<((nextState: WidgetState) => void) | null>(null);
   const registerWidgetSync = useCallback((handler: (nextState: WidgetState) => void) => {
     applyRemoteWidgetStateRef.current = handler;
@@ -36,26 +40,43 @@ function App() {
   const handleRemoteWidgetState = useCallback((nextState: WidgetState) => {
     applyRemoteWidgetStateRef.current?.(nextState);
   }, []);
-  useStorageSync({ onPetStateChanged: applyRemotePetState, onWidgetStateChanged: handleRemoteWidgetState });
+  const handleMissionCompleted = useCallback((completions: import('../types/dailyMission').DailyMissionCompletion[], rewardExp: number) => {
+    if (rewardExp > 0) addBonusExp(rewardExp);
+    const first = completions[0];
+    if (first) {
+      expToast.showExpGain(rewardExp);
+      speechBubble.showMessage('typing', true);
+      console.log('[Typetchi] daily mission completed', { title: first.title, rewardExp });
+    }
+  }, [addBonusExp, expToast, speechBubble]);
+  const { missionsState, recordMissionProgress, applyRemoteDailyMissionsState } = useDailyMissions(handleMissionCompleted);
+  useStorageSync({ onPetStateChanged: applyRemotePetState, onWidgetStateChanged: handleRemoteWidgetState, onDailyMissionsChanged: applyRemoteDailyMissionsState });
   const { speedState, recordTyping, resetTypingStats } = useTypingStats({
     todayMaxCpm: petState.todayMaxCpm,
     todayMaxWpm: petState.todayMaxWpm,
     onTodayMaxChange: updateTodayTypingSpeedMax,
   });
   const handleValidTyping = useCallback((input: ValidTypingInput) => {
+    const dateKey = getLocalDateKey(new Date(input.timestamp));
+    const isNewDay = sessionRef.current.dateKey !== dateKey;
+    const startsNewSession = isNewDay || !sessionRef.current.lastTypedAt || input.timestamp - sessionRef.current.lastTypedAt > TYPING_SESSION_IDLE_TIMEOUT;
+    const nextSessionCount = startsNewSession ? (isNewDay ? 1 : sessionRef.current.count + 1) : sessionRef.current.count;
+    sessionRef.current = { dateKey, count: nextSessionCount, lastTypedAt: input.timestamp };
     addTypingExp(input.addedChars);
     recordTyping(input.addedChars, input.timestamp);
-  }, [addTypingExp, recordTyping]);
+    recordMissionProgress({ addedChars: input.addedChars, todayTypedCount: petState.todayTypedCount + input.addedChars, todayMaxCpm: Math.max(speedState.todayMaxCpm, speedState.recentCpm + input.addedChars), todaySessionCount: nextSessionCount, timestamp: input.timestamp });
+  }, [addTypingExp, petState.todayTypedCount, recordMissionProgress, recordTyping, speedState.recentCpm, speedState.todayMaxCpm]);
   useTypingTracker(handleValidTyping, pasteDetection.showPasteHint);
   const handleResetPetProgress = useCallback(async () => {
     const confirmed = window.confirm('確定要重置角色進度嗎？EXP、等級與今日統計會歸零。');
     if (!confirmed) return;
     await resetProgress();
+    sessionRef.current = { dateKey: '', count: 0, lastTypedAt: 0 };
     resetTypingStats();
     speechBubble.showMessage('resetProgress', true);
   }, [resetProgress, resetTypingStats, speechBubble]);
 
-  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} onResetPetProgress={handleResetPetProgress} onWidgetStateReady={registerWidgetSync} />;
+  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} missionsState={missionsState} onResetPetProgress={handleResetPetProgress} onWidgetStateReady={registerWidgetSync} />;
 }
 
 function ensureTypetchiRoot() {

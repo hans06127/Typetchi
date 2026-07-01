@@ -5,6 +5,7 @@
   const WIDGET_KEY = 'typetchi.widgetState';
   const SETTINGS_KEY = 'typetchi.settings';
   const TYPING_STATS_KEY = 'typetchi.typingStats';
+  const DAILY_MISSIONS_KEY = 'typetchi.dailyMissions';
   const FLUSH_DELAY_MS = 1000;
   const PET_ANIMATION_DURATION = { typing: 400, happy: 800, level_up: 1200, evolve: 1800 };
   const PET_MESSAGES = { typing: ['正在吸收文字能量...', '今天也很努力呢', '繼續打字，我會長大！'], levelUp: ['升級了！', '變得更有精神了！'], evolve: ['進化了！', '新的樣子登場！'], paste: ['貼上的文字不會增加經驗值', '只計算手打的文字喔'], resetWidget: ['視窗位置已重置'], resetProgress: ['角色進度已重置'] };
@@ -15,6 +16,11 @@
   const TYPING_SESSION_IDLE_TIMEOUT = 10000;
   const TYPING_EVENT_RETENTION_MS = 120000;
   const TYPING_SPEED_WINDOW_MS = 60000;
+  const DAILY_MISSION_DEFINITIONS = [
+    { id: 'typed-300', type: 'typed_chars', title: '今日手打 300 字', description: '只計算有效手打輸入，不包含貼上文字。', targetValue: 300, rewardExp: 30 },
+    { id: 'max-cpm-60', type: 'max_cpm', title: '最高速度 60 CPM', description: '今日最高打字速度達到 60 CPM。', targetValue: 60, rewardExp: 50 },
+    { id: 'sessions-3', type: 'typing_sessions', title: '完成 3 次打字 session', description: '有效手打並在閒置後重新開始會建立新 session。', targetValue: 3, rewardExp: 40 },
+  ];
   const COLLAPSED_HANDLE_BOUNDS = { width: 64, height: 52 };
   const EVOLUTION_NODES = [
     { id: 'stage_1', name: '幼年期', requiredExp: 0, icon: '🌱', conditions: [{ type: 'total_exp', operator: '>=', value: 0 }] },
@@ -36,6 +42,10 @@
   let widgetFlushTimer;
   let pendingPetState = null;
   let pendingWidgetState = null;
+  let dailyMissionsState = defaultDailyMissionsState();
+  let dailyMissionFlushTimer;
+  let pendingDailyMissionsState = null;
+  let todaySessionCount = 0;
   let isApplyingRemoteUpdate = false;
   let isMounting = false;
   let ensureRootTimer;
@@ -66,6 +76,12 @@
   }
   function defaultWidgetState() {
     return { x: Math.max(16, window.innerWidth - 300), y: Math.max(16, window.innerHeight - 380), width: 280, height: 360, pinned: false, collapsed: false, closed: false };
+  }
+  function createDailyMissions(key = dateKey()) {
+    return DAILY_MISSION_DEFINITIONS.map((definition) => ({ ...definition, progress: 0, completed: false, rewardClaimed: false, completedAt: null, dateKey: key }));
+  }
+  function defaultDailyMissionsState(key = dateKey()) {
+    return { dateKey: key, missions: createDailyMissions(key), updatedAt: Date.now() };
   }
   function isExtensionContextInvalidated(error) {
     return error instanceof Error && error.message.includes('Extension context invalidated');
@@ -162,6 +178,14 @@
     pendingPetState = null;
     storageSet(PET_KEY, { ...state, updatedAt: Date.now() }).then(() => console.log('[Typetchi] storage flushed'));
   }
+  function flushDailyMissionsState() {
+    if (dailyMissionFlushTimer) window.clearTimeout(dailyMissionFlushTimer);
+    dailyMissionFlushTimer = undefined;
+    if (!pendingDailyMissionsState) return;
+    const state = pendingDailyMissionsState;
+    pendingDailyMissionsState = null;
+    storageSet(DAILY_MISSIONS_KEY, { ...state, updatedAt: Date.now() }).then(() => console.log('[Typetchi] storage flushed'));
+  }
   function flushWidgetState() {
     if (widgetFlushTimer) window.clearTimeout(widgetFlushTimer);
     widgetFlushTimer = undefined;
@@ -176,6 +200,12 @@
     if (petFlushTimer) window.clearTimeout(petFlushTimer);
     petFlushTimer = window.setTimeout(flushPetState, FLUSH_DELAY_MS);
   }
+  function scheduleDailyMissionsFlush(state) {
+    if (isApplyingRemoteUpdate) return;
+    pendingDailyMissionsState = state;
+    if (dailyMissionFlushTimer) window.clearTimeout(dailyMissionFlushTimer);
+    dailyMissionFlushTimer = window.setTimeout(flushDailyMissionsState, 300);
+  }
   function scheduleWidgetFlush(state) {
     if (isApplyingRemoteUpdate) return;
     pendingWidgetState = normalizeWidgetState(state);
@@ -188,6 +218,7 @@
     typingEvents = [];
     typingStatsActiveDate = dateKey();
     typingSpeedState = { recentCpm: 0, recentWpm: 0, todayMaxCpm: 0, todayMaxWpm: 0, sessionChars: 0, sessionStartedAt: null, lastTypedAt: null };
+    todaySessionCount = 0;
     pendingPetState = petState;
     flushPetState();
     showSpeech('resetProgress', true);
@@ -196,6 +227,7 @@
   function flushAllStorage() {
     flushPetState();
     flushWidgetState();
+    flushDailyMissionsState();
   }
   function calculateLevel(totalExp) {
     return Math.floor(totalExp / 100) + 1;
@@ -282,6 +314,43 @@
   function pruneTypingEvents(events, now) { const threshold = now - TYPING_EVENT_RETENTION_MS; return events.filter((event) => event.timestamp >= threshold); }
   function calculateCpm(events, now) { const windowStartedAt = now - TYPING_SPEED_WINDOW_MS; return events.filter((event) => event.timestamp >= windowStartedAt).reduce((sum, event) => sum + event.addedChars, 0); }
   function calculateWpm(cpm) { return Math.round(cpm / 5); }
+  function applyBonusExp(bonusExp) {
+    const nextTotalExp = petState.totalExp + Math.max(0, bonusExp);
+    const previousLevel = petState.level;
+    const previousStage = petState.currentStage;
+    petState = { ...petState, totalExp: nextTotalExp, level: calculateLevel(nextTotalExp), currentStage: calculateStage(nextTotalExp, { todayMaxCpm: petState.todayMaxCpm }), lastActiveDate: dateKey() };
+    schedulePetFlush(petState);
+    showExpToast(bonusExp);
+    if (previousStage !== petState.currentStage) showSpeech('evolve', true);
+    else if (previousLevel < petState.level) showSpeech('levelUp', true);
+    else showSpeech('typing', true);
+  }
+  function ensureDailyMissionsForToday() {
+    const today = dateKey();
+    if (dailyMissionsState.dateKey !== today) dailyMissionsState = defaultDailyMissionsState(today);
+  }
+  function progressForMission(type, input) {
+    if (type === 'typed_chars') return input.todayTypedCount;
+    if (type === 'max_cpm') return input.todayMaxCpm;
+    if (type === 'typing_sessions') return input.todaySessionCount;
+    return 0;
+  }
+  function updateDailyMissionProgress(input) {
+    ensureDailyMissionsForToday();
+    const completions = [];
+    dailyMissionsState = { ...dailyMissionsState, missions: dailyMissionsState.missions.map((mission) => {
+      const progress = Math.min(mission.targetValue, Math.max(mission.progress, progressForMission(mission.type, input)));
+      if (mission.completed || progress < mission.targetValue) return { ...mission, progress };
+      completions.push(mission);
+      return { ...mission, progress, completed: true, rewardClaimed: true, completedAt: input.timestamp };
+    }), updatedAt: input.timestamp };
+    if (completions.length > 0) {
+      const rewardExp = completions.reduce((sum, mission) => sum + mission.rewardExp, 0);
+      console.log('[Typetchi] daily mission completed', { title: completions[0].title, rewardExp });
+      applyBonusExp(rewardExp);
+    }
+    scheduleDailyMissionsFlush(dailyMissionsState);
+  }
   function updateTypingStats(addedChars, timestamp) {
     const eventDate = dateKey(new Date(timestamp));
     const isNewDay = typingStatsActiveDate !== eventDate;
@@ -294,6 +363,7 @@
     const recentCpm = calculateCpm(typingEvents, timestamp);
     const recentWpm = calculateWpm(recentCpm);
     const shouldStartNewSession = !typingSpeedState.lastTypedAt || timestamp - typingSpeedState.lastTypedAt > TYPING_SESSION_IDLE_TIMEOUT;
+    if (shouldStartNewSession) todaySessionCount = isNewDay ? 1 : todaySessionCount + 1;
     typingSpeedState = {
       recentCpm,
       recentWpm,
@@ -505,11 +575,42 @@
       makeRow('目前速度', typingSpeedState.recentCpm + ' CPM / ' + typingSpeedState.recentWpm + ' WPM', true),
       makeRow('今日最高', typingSpeedState.todayMaxCpm + ' CPM', true),
     );
+    const missionsPanel = document.createElement('div');
+    missionsPanel.className = 'typetchi-missions';
+    const missionHeading = document.createElement('div');
+    missionHeading.className = 'typetchi-mission-heading';
+    missionHeading.textContent = '今日任務';
+    missionsPanel.append(missionHeading);
+    ensureDailyMissionsForToday();
+    dailyMissionsState.missions.forEach((mission) => {
+      const item = document.createElement('div');
+      item.className = 'typetchi-mission' + (mission.completed ? ' completed' : '');
+      const top = document.createElement('div');
+      top.className = 'typetchi-mission-line';
+      const title = document.createElement('span');
+      title.className = 'typetchi-mission-title';
+      title.textContent = (mission.completed ? '✓ ' : '') + mission.title;
+      const reward = document.createElement('span');
+      reward.textContent = '+' + mission.rewardExp + ' EXP';
+      top.append(title, reward);
+      const bottom = document.createElement('div');
+      bottom.className = 'typetchi-mission-line';
+      bottom.append(document.createTextNode(mission.completed ? '已完成' : mission.progress + ' / ' + mission.targetValue), document.createTextNode(mission.rewardClaimed ? '已領取' : '未完成'));
+      const track = document.createElement('div');
+      track.className = 'typetchi-mission-track';
+      const fill = document.createElement('span');
+      fill.className = 'typetchi-mission-fill';
+      fill.style.width = Math.min(100, Math.round((mission.progress / mission.targetValue) * 100)) + '%';
+      track.append(fill);
+      item.append(top, bottom, track);
+      missionsPanel.append(item);
+    });
     stats.append(
       makeRow(`Lv. ${petState.level}`, stage.name, false, true),
       makeRow('EXP', progress.isMaxStage ? '最高階段' : progress.current + ' / ' + progress.required),
       bar,
       statsPanel,
+      missionsPanel,
       makeRow('下一階段', nextStage?.name ?? '已成熟', true),
     );
     body.append(bubble, stageArea, stats);
@@ -620,6 +721,7 @@
     console.log('[Typetchi] typing tracked', { addedChars });
     addTypingExp(addedChars);
     updateTypingStats(addedChars, timestamp);
+    updateDailyMissionProgress({ addedChars, todayTypedCount: petState.todayTypedCount, todayMaxCpm: typingSpeedState.todayMaxCpm, todaySessionCount, timestamp });
   }
 
   function applyRemoteState(callback) {
@@ -641,6 +743,10 @@
           render();
         });
       }
+      const missionChange = changes[DAILY_MISSIONS_KEY];
+      if (missionChange?.newValue && (missionChange.newValue.updatedAt ?? 0) >= (dailyMissionsState.updatedAt ?? 0)) {
+        applyRemoteState(() => { dailyMissionsState = missionChange.newValue.dateKey === dateKey() ? missionChange.newValue : defaultDailyMissionsState(); render(); });
+      }
       const widgetChange = changes[WIDGET_KEY];
       if (widgetChange?.newValue && (widgetChange.newValue.updatedAt ?? 0) >= (widgetState.updatedAt ?? 0)) {
         applyRemoteState(() => { widgetState = normalizeWidgetState(widgetChange.newValue); render(); });
@@ -656,11 +762,13 @@
     window.addEventListener('beforeunload', flushAllStorage);
   }
   function loadStorageAndRender() {
-    Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState())]).then(([storedPet, storedWidget]) => {
+    Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState()), storageGet(DAILY_MISSIONS_KEY, defaultDailyMissionsState())]).then(([storedPet, storedWidget, storedMissions]) => {
       const today = dateKey();
       petState = { ...storedPet, level: calculateLevel(storedPet.totalExp), currentStage: calculateStage(storedPet.totalExp, { todayMaxCpm: storedPet.todayMaxCpm }), todayTypedCount: storedPet.lastActiveDate === today ? storedPet.todayTypedCount : 0, todayMaxCpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxCpm ?? 0) : 0, todayMaxWpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
       typingSpeedState = { ...typingSpeedState, todayMaxCpm: petState.todayMaxCpm, todayMaxWpm: petState.todayMaxWpm };
       widgetState = normalizeWidgetState(storedWidget);
+      dailyMissionsState = storedMissions.dateKey === today ? storedMissions : defaultDailyMissionsState(today);
+      if (storedMissions.dateKey !== today) scheduleDailyMissionsFlush(dailyMissionsState);
       console.log('[Typetchi] storage loaded');
       render();
     });

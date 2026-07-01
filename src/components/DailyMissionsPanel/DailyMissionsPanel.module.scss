@@ -1,0 +1,10 @@
+.panel { display: grid; gap: 6px; padding: 8px; border: 1px solid rgba(138,120,110,.16); border-radius: 14px; background: rgba(255,255,255,.45); }
+.heading { font-size: 12px; font-weight: 800; color: #6f5d53; }
+.empty { font-size: 12px; color: #8a786e; }
+.mission { display: grid; gap: 4px; min-width: 0; padding: 7px; border-radius: 12px; background: rgba(255,249,244,.74); }
+.completed { background: rgba(222,248,235,.72); }
+.titleRow, .progressRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
+.reward, .progressRow { flex: 0 0 auto; font-size: 11px; color: #8a786e; }
+.track { overflow: hidden; height: 5px; border-radius: 999px; background: rgba(138,120,110,.16); }
+.track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f6a6b8, #91d7ae); transition: width 160ms ease; }

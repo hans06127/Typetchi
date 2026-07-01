@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { STORAGE_KEYS } from '../storage/storageKeys';
 import type { UserPetState } from '../types/pet';
+import type { DailyMissionsState } from '../types/dailyMission';
 import type { WidgetState } from '../types/widget';
 
 export type StateUpdateSource = 'local' | 'remote';
@@ -12,6 +13,7 @@ export function useStorageSync(params: {
   onWidgetStateChanged?: (nextState: WidgetState) => void;
   onSettingsChanged?: (nextState: SettingsState) => void;
   onTypingStatsChanged?: (nextState: TypingStatsPersistedState) => void;
+  onDailyMissionsChanged?: (nextState: DailyMissionsState) => void;
 }) {
   useEffect(() => {
     if (!globalThis.chrome?.storage?.onChanged) return;
@@ -34,6 +36,11 @@ export function useStorageSync(params: {
         params.onSettingsChanged(settingsChange.newValue as SettingsState);
       }
 
+      const dailyMissionsChange = changes[STORAGE_KEYS.DAILY_MISSIONS];
+      if (dailyMissionsChange?.newValue && params.onDailyMissionsChanged) {
+        params.onDailyMissionsChanged(dailyMissionsChange.newValue as DailyMissionsState);
+      }
+
       const typingStatsChange = changes[STORAGE_KEYS.TYPING_STATS];
       if (typingStatsChange?.newValue && params.onTypingStatsChanged) {
         params.onTypingStatsChanged(typingStatsChange.newValue as TypingStatsPersistedState);
@@ -42,5 +49,5 @@ export function useStorageSync(params: {
 
     chrome.storage.onChanged.addListener(handleChanged);
     return () => chrome.storage.onChanged.removeListener(handleChanged);
-  }, [params.onPetStateChanged, params.onSettingsChanged, params.onTypingStatsChanged, params.onWidgetStateChanged]);
+  }, [params.onDailyMissionsChanged, params.onPetStateChanged, params.onSettingsChanged, params.onTypingStatsChanged, params.onWidgetStateChanged]);
 }
