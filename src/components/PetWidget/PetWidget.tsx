@@ -3,6 +3,7 @@ import { createDefaultWidgetState } from '../../config/defaultState';
 import { getNextStage, getStage } from '../../systems/evolutionSystem';
 import { calculateStageProgress } from '../../systems/stageProgressSystem';
 import { loadWidgetState, normalizeWidgetState, saveWidgetState } from '../../storage/widgetStorage';
+import type { DailyMissionsState } from '../../types/dailyMission';
 import type { PetAnimationState, UserPetState } from '../../types/pet';
 import type { WidgetState } from '../../types/widget';
 import type { TypingSpeedState } from '../../types/typingStats';
@@ -11,6 +12,7 @@ import { ExpGainToast } from '../ExpGainToast/ExpGainToast';
 import { PetCharacter } from '../PetCharacter/PetCharacter';
 import { SpeechBubble } from '../SpeechBubble/SpeechBubble';
 import { WidgetControls } from '../WidgetControls/WidgetControls';
+import { DailyMissionsPanel } from '../DailyMissionsPanel/DailyMissionsPanel';
 import { TypingStatsPanel } from '../TypingStatsPanel/TypingStatsPanel';
 import { SettingsPanel } from '../SettingsPanel/SettingsPanel';
 import { useDraggable } from '../../hooks/useDraggable';
@@ -24,11 +26,12 @@ interface PetWidgetProps {
   expToast: { amount: number; visible: boolean };
   speechBubble: { message: string | null; visible: boolean; showMessage: (kind: 'typing' | 'levelUp' | 'evolve' | 'paste' | 'resetWidget' | 'resetProgress', force?: boolean) => void };
   speedState: TypingSpeedState;
+  missionsState: DailyMissionsState | null;
   onResetPetProgress: () => void;
   onWidgetStateReady?: (handler: (nextState: WidgetState) => void) => void;
 }
 
-export function PetWidget({ petState, animationState, expToast, speechBubble, speedState, onResetPetProgress, onWidgetStateReady }: PetWidgetProps) {
+export function PetWidget({ petState, animationState, expToast, speechBubble, speedState, missionsState, onResetPetProgress, onWidgetStateReady }: PetWidgetProps) {
   const [widget, setWidget] = useState<WidgetState>(createDefaultWidgetState);
   const { scheduleFlush: scheduleWidgetFlush } = useDebouncedStorageFlush<WidgetState>(saveWidgetState, 1000);
   useEffect(() => { void loadWidgetState().then((state) => { console.log('[Typetchi] storage loaded'); setWidget(state); }); }, []);
@@ -100,6 +103,7 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
         <div className={styles.row}><span>EXP</span><span>{stageProgress.isMaxStage ? '最高階段' : `${stageProgress.current} / ${stageProgress.required}`}</span></div>
         <ExpBar value={stageProgress.current} max={stageProgress.required} percentage={stageProgress.percentage} />
         <TypingStatsPanel todayTypedCount={petState.todayTypedCount} recentCpm={speedState.recentCpm} recentWpm={speedState.recentWpm} todayMaxCpm={speedState.todayMaxCpm} />
+        <DailyMissionsPanel missionsState={missionsState} />
         <div className={styles.row}><span className={styles.muted}>下一階段</span><span>{nextStage?.name ?? '已成熟'}</span></div>
       </div>
     </div>

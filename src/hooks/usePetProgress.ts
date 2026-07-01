@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { defaultPetState } from '../config/defaultState';
-import { applyTypingExp, calculateExpFromTyping } from '../systems/expSystem';
+import { applyBonusExp, applyTypingExp, calculateExpFromTyping } from '../systems/expSystem';
 import type { PetAnimationState, UserPetState } from '../types/pet';
 import { loadPetState, savePetState } from '../storage/petStorage';
 import { resetPetProgress } from '../storage/resetStorage';
@@ -56,11 +56,23 @@ export function usePetProgress(onTypingProgress?: (result: TypingProgressResult)
     });
   }, [onTypingProgress, scheduleFlush]);
 
+  const addBonusExp = useCallback((bonusExp: number) => {
+    setPetState((current) => {
+      const next = applyBonusExp(current, bonusExp);
+      const evolved = current.currentStage !== next.currentStage;
+      const leveledUp = current.level < next.level;
+      const animationState: PetAnimationState = evolved ? 'evolve' : leveledUp ? 'level_up' : bonusExp > 0 ? 'happy' : 'typing';
+      onTypingProgress?.({ gainedExp: bonusExp, animationState, leveledUp, evolved });
+      scheduleFlush(next);
+      return next;
+    });
+  }, [onTypingProgress, scheduleFlush]);
+
   const resetProgress = useCallback(async () => {
     const next = await resetPetProgress();
     setPetState(next);
     return next;
   }, []);
 
-  return { petState, addTypingExp, updateTodayTypingSpeedMax, resetProgress, flushNow, applyRemotePetState };
+  return { petState, addTypingExp, addBonusExp, updateTodayTypingSpeedMax, resetProgress, flushNow, applyRemotePetState };
 }

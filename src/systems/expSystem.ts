@@ -21,3 +21,14 @@ export function applyTypingExp(state: UserPetState, addedChars: number): UserPet
     lastActiveDate: today,
   };
 }
+
+export function applyBonusExp(state: UserPetState, bonusExp: number): UserPetState {
+  const nextTotalExp = state.totalExp + Math.max(0, bonusExp);
+  return {
+    ...state,
+    totalExp: nextTotalExp,
+    level: calculateLevel(nextTotalExp),
+    currentStage: calculateStage(nextTotalExp, { todayMaxCpm: state.todayMaxCpm }),
+    lastActiveDate: getLocalDateKey(),
+  };
+}
