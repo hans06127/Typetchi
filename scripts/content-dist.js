@@ -432,29 +432,34 @@
     style.textContent = `
       :host { all: initial; }
       #typetchi-app { pointer-events: none; }
-      .typetchi-widget { position: fixed; z-index: 2147483647; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; min-width: 240px; min-height: 280px; max-width: min(420px, calc(100vw - 32px)); max-height: min(560px, calc(100vh - 32px)); border: 1px solid rgba(255,255,255,.75); border-radius: 22px; background: rgba(255,249,244,.92); box-shadow: 0 18px 50px rgba(91,68,56,.22); color: #574941; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; backdrop-filter: blur(14px); pointer-events: auto; transform-origin: bottom right; transform: translateY(0) scale(1); opacity: 1; transition: transform 180ms ease, opacity 180ms ease; }
-      .typetchi-header { flex: 0 0 auto; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 8px 16px; background: linear-gradient(135deg, rgba(255,218,226,.78), rgba(222,248,235,.66)); cursor: grab; user-select: none; border-radius: 22px 22px 0 0; }
-      .typetchi-title { font-weight: 800; letter-spacing: .02em; }
-      .typetchi-controls { display: flex; gap: 6px; }
-      button { border: 0; border-radius: 999px; background: rgba(255,255,255,.72); color: #6b5a52; cursor: pointer; font-size: 12px; padding: 5px 8px; pointer-events: auto; }
+      .typetchi-widget { position: fixed; z-index: 2147483647; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; min-width: 232px; min-height: 260px; max-width: min(420px, calc(100vw - 32px)); max-height: min(560px, calc(100vh - 32px)); border: 1px solid rgba(255,255,255,.75); border-radius: 22px; background: rgba(255,249,244,.92); box-shadow: 0 18px 50px rgba(91,68,56,.22); color: #574941; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; backdrop-filter: blur(14px); pointer-events: auto; transform-origin: bottom right; transform: translateY(0) scale(1); opacity: 1; transition: transform 180ms ease, opacity 180ms ease; }
+      .typetchi-header { flex: 0 0 auto; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 8px 14px; background: linear-gradient(135deg, rgba(255,218,226,.78), rgba(222,248,235,.66)); cursor: grab; user-select: none; border-radius: 22px 22px 0 0; }
+      .typetchi-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 850; letter-spacing: .02em; }
+      .typetchi-controls { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
+      button { min-height: 30px; border: 0; border-radius: 999px; background: rgba(255,255,255,.72); color: #6b5a52; cursor: pointer; font-size: 11px; font-weight: 750; padding: 6px 8px; pointer-events: auto; white-space: nowrap; }
       button:hover { background: white; }
-      .typetchi-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 16px 12px; display: grid; gap: 8px; } .typetchi-body::-webkit-scrollbar { width: 6px; } .typetchi-body::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(138,120,110,.28); }
-      .typetchi-stage { display: grid; place-items: center; min-height: 104px; }
+      .typetchi-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 14px 12px; display: grid; align-content: start; gap: 10px; } .typetchi-body::-webkit-scrollbar { width: 6px; } .typetchi-body::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(138,120,110,.28); }
+      .typetchi-stage { display: grid; place-items: center; min-height: clamp(88px, 28vh, 126px); padding: 4px 0 0; }
       .typetchi-pet { position: relative; width: 82px; height: 82px; transform-origin: center bottom; }
       .typetchi-pet-body { position: absolute; inset: 10px; border-radius: 48% 52% 45% 55%; background: linear-gradient(145deg, #ffd6dc, #ffb7c7); box-shadow: inset -8px -10px 18px rgba(173,82,104,.13), 0 12px 24px rgba(153,96,96,.2); }
       .typetchi-face { position: absolute; left: 28px; right: 28px; top: 39px; display: flex; justify-content: space-between; } .typetchi-eye { width: 7px; height: 9px; border-radius: 999px; background: #58423c; }
       .stage_1 .typetchi-pet-body { background: linear-gradient(145deg, #d8f6c5, #aee7bc); } .stage_2 .typetchi-pet-body { background: linear-gradient(145deg, #c7f0ff, #9bd8ff); } .stage_3 .typetchi-pet-body { background: linear-gradient(145deg, #ffe3a8, #ffb9c9); }
       .typetchi-ear { position: absolute; top: 6px; width: 20px; height: 28px; border-radius: 999px 999px 12px 12px; background: #ffc4d0; z-index: -1; } .typetchi-ear.left { left: 16px; transform: rotate(-24deg); } .typetchi-ear.right { right: 16px; transform: rotate(24deg); }
       .typetchi-arm { position: absolute; top: 50px; width: 18px; height: 11px; border-radius: 999px; background: #ffc1ca; } .typetchi-arm.left { left: 2px; transform: rotate(-18deg); } .typetchi-arm.right { right: 2px; transform: rotate(18deg); }
-      .typetchi-name { margin-top: 8px; color: #6b5a52; font-weight: 700; text-align: center; }
+      .typetchi-name { display: none; }
       .typetchi-bubble { min-height: 18px; justify-self: center; max-width: 100%; padding: 6px 10px; border-radius: 14px; background: rgba(255,255,255,.86); color: #6b5145; font-size: 12px; font-weight: 700; opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; } .typetchi-bubble.visible { opacity: 1; transform: translateY(0); }
       .typetchi-toast { position: absolute; right: 16px; bottom: 92px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: rgba(255,238,170,.96); color: #765022; font-size: 12px; font-weight: 800; opacity: 0; pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; } .typetchi-toast.visible { opacity: 1; animation: typetchi-exp-toast 1s ease-out; }
       .typetchi-pet.idle { animation: typetchi-idle 2.4s ease-in-out infinite; } .typetchi-pet.typing { animation: typetchi-typing .4s ease-in-out; } .typetchi-pet.happy { animation: typetchi-happy .8s ease-in-out; } .typetchi-pet.level_up { animation: typetchi-level-up 1.2s ease-in-out; } .typetchi-pet.evolve { animation: typetchi-evolve 1.8s ease-in-out; }
-      .typetchi-stats { display: grid; gap: 7px; font-size: 13px; }
-      .typetchi-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; } .typetchi-row span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; } .typetchi-stats-panel { display: grid; gap: 7px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.46); } .typetchi-footer { flex: 0 0 auto; display: grid; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid rgba(126,101,88,.12); background: rgba(255,249,244,.58); border-radius: 0 0 22px 22px; } .typetchi-footer-label { color: #9a897f; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; } .typetchi-footer .subtle-danger { justify-self: start; padding: 4px 8px; color: #8a5b50; background: transparent; box-shadow: none; text-decoration: underline; text-decoration-color: rgba(138,91,80,.32); text-underline-offset: 3px; }
+      .typetchi-stats { display: grid; gap: 10px; font-size: 13px; }
+      .typetchi-progress-card { display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(138,120,110,.14); border-radius: 16px; background: rgba(255,255,255,.52); }
+      .typetchi-level-text { font-size: 17px; font-weight: 850; color: #4f413a; }
+      .typetchi-stage-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6f5d53; font-size: 12px; font-weight: 750; text-align: right; }
+      .typetchi-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; } .typetchi-row span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; } .typetchi-stats-panel { display: grid; gap: 7px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.46); } .typetchi-footer { flex: 0 0 auto; display: grid; gap: 6px; padding: 6px 12px 10px; border-top: 1px solid rgba(126,101,88,.12); background: rgba(255,249,244,.58); border-radius: 0 0 22px 22px; } .typetchi-footer-label { color: #9a897f; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; } .typetchi-footer .subtle-danger { justify-self: start; padding: 4px 8px; color: #8a5b50; background: transparent; box-shadow: none; text-decoration: underline; text-decoration-color: rgba(138,91,80,.32); text-underline-offset: 3px; }
       .typetchi-muted { color: #8a786e; }
-      .typetchi-bar { height: 10px; background: rgba(95,78,65,.14); border-radius: 999px; overflow: hidden; }
+      .typetchi-bar { height: 8px; background: rgba(95,78,65,.14); border-radius: 999px; overflow: hidden; }
       .typetchi-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffb7c5, #ffd88a, #9ee7c6); transition: width 220ms ease; }
+
+      .typetchi-missions { display: grid; gap: 7px; padding: 9px; border: 1px solid rgba(138,120,110,.16); border-radius: 16px; background: rgba(255,255,255,.48); } .typetchi-mission-head { display:flex; justify-content:space-between; gap:8px; } .typetchi-mission-heading { font-size:12px; font-weight:850; color:#5f4f47; } .typetchi-mission-summary { color:#8a786e; font-size:11px; font-weight:700; } .typetchi-mission-all { padding:6px 8px; border-radius:12px; background:rgba(222,248,235,.62); color:#5f6f58; font-size:11px; font-weight:750; } .typetchi-mission { display:grid; gap:5px; min-width:0; padding:8px; border-radius:13px; background:rgba(255,249,244,.78); box-shadow: inset 0 0 0 1px rgba(126,101,88,.08); } .typetchi-mission.completed { background:rgba(222,248,235,.72); } .typetchi-mission-line { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; color:#8a786e; font-size:11px; font-weight:700; } .typetchi-mission-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#574941; font-size:12px; font-weight:780; } .typetchi-reward { flex:0 0 auto; padding:2px 7px; border-radius:999px; background:rgba(255,232,159,.72); color:#765022; font-size:11px; font-weight:850; } .typetchi-mission-track { overflow:hidden; height:5px; border-radius:999px; background:rgba(138,120,110,.16); } .typetchi-mission-fill { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#f6a6b8,#91d7ae); transition:width 160ms ease; }
       .typetchi-resize { position: absolute; right: 4px; bottom: 4px; width: 18px; height: 18px; cursor: nwse-resize; pointer-events: auto; }
       .typetchi-resize::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(87,73,65,.38); border-bottom: 2px solid rgba(87,73,65,.38); }
       .typetchi-handle { position: absolute; left: 50%; top: 6px; display: none; align-items: center; justify-content: center; width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,249,244,.96); transform: translateX(-50%); box-shadow: 0 8px 22px rgba(91,68,56,.18); pointer-events: auto; } .typetchi-handle:hover::after { content: '點擊展開'; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 4px 8px; border-radius: 999px; background: rgba(87,73,65,.9); color: white; font-size: 11px; } .typetchi-handle .typetchi-pet { width: 32px; height: 32px; }
@@ -577,11 +582,24 @@
     );
     const missionsPanel = document.createElement('div');
     missionsPanel.className = 'typetchi-missions';
+    ensureDailyMissionsForToday();
+    const completedCount = dailyMissionsState.missions.filter((mission) => mission.completed).length;
+    const missionHead = document.createElement('div');
+    missionHead.className = 'typetchi-mission-head';
     const missionHeading = document.createElement('div');
     missionHeading.className = 'typetchi-mission-heading';
     missionHeading.textContent = '今日任務';
-    missionsPanel.append(missionHeading);
-    ensureDailyMissionsForToday();
+    const missionSummary = document.createElement('div');
+    missionSummary.className = 'typetchi-mission-summary';
+    missionSummary.textContent = completedCount + ' / ' + dailyMissionsState.missions.length;
+    missionHead.append(missionHeading, missionSummary);
+    missionsPanel.append(missionHead);
+    if (dailyMissionsState.missions.length > 0 && completedCount === dailyMissionsState.missions.length) {
+      const allDone = document.createElement('div');
+      allDone.className = 'typetchi-mission-all';
+      allDone.textContent = '今日任務全部完成，辛苦了！';
+      missionsPanel.append(allDone);
+    }
     dailyMissionsState.missions.forEach((mission) => {
       const item = document.createElement('div');
       item.className = 'typetchi-mission' + (mission.completed ? ' completed' : '');
@@ -589,39 +607,45 @@
       top.className = 'typetchi-mission-line';
       const title = document.createElement('span');
       title.className = 'typetchi-mission-title';
-      title.textContent = (mission.completed ? '✓ ' : '') + mission.title;
+      title.textContent = (mission.completed ? '✓ ' : '• ') + mission.title;
       const reward = document.createElement('span');
+      reward.className = 'typetchi-reward';
       reward.textContent = '+' + mission.rewardExp + ' EXP';
       top.append(title, reward);
       const bottom = document.createElement('div');
       bottom.className = 'typetchi-mission-line';
-      bottom.append(document.createTextNode(mission.completed ? '已完成' : mission.progress + ' / ' + mission.targetValue), document.createTextNode(mission.rewardClaimed ? '已領取' : '未完成'));
+      const progressPercent = Math.min(100, Math.round((mission.progress / mission.targetValue) * 100));
+      bottom.append(document.createTextNode(mission.completed ? '已完成' : mission.progress + ' / ' + mission.targetValue), document.createTextNode(mission.rewardClaimed ? '獎勵已領取' : progressPercent + '%'));
       const track = document.createElement('div');
       track.className = 'typetchi-mission-track';
       const fill = document.createElement('span');
       fill.className = 'typetchi-mission-fill';
-      fill.style.width = Math.min(100, Math.round((mission.progress / mission.targetValue) * 100)) + '%';
+      fill.style.width = progressPercent + '%';
       track.append(fill);
       item.append(top, bottom, track);
       missionsPanel.append(item);
     });
-    stats.append(
+    const progressCard = document.createElement('section');
+    progressCard.className = 'typetchi-progress-card';
+    progressCard.setAttribute('aria-label', '等級與 EXP');
+    progressCard.append(
       makeRow(`Lv. ${petState.level}`, stage.name, false, true),
       makeRow('EXP', progress.isMaxStage ? '最高階段' : progress.current + ' / ' + progress.required),
       bar,
-      statsPanel,
-      missionsPanel,
       makeRow('下一階段', nextStage?.name ?? '已成熟', true),
     );
+    stats.append(progressCard, missionsPanel, statsPanel);
     body.append(bubble, stageArea, stats);
     const footer = document.createElement('footer');
     footer.className = 'typetchi-footer';
-    const footerLabel = document.createElement('div');
+    const details = document.createElement('details');
+    const footerLabel = document.createElement('summary');
     footerLabel.className = 'typetchi-footer-label';
     footerLabel.textContent = 'Advanced';
     const resetPetButton = createButton('重置角色進度', resetPetProgress);
     resetPetButton.className = 'subtle-danger';
-    footer.append(footerLabel, resetPetButton);
+    details.append(footerLabel, resetPetButton);
+    footer.append(details);
     const resize = document.createElement('span');
     resize.className = 'typetchi-resize';
     header.addEventListener('pointerdown', startDrag);
@@ -696,7 +720,7 @@
     if (widgetState.pinned) return;
     const start = { x: event.clientX, y: event.clientY, width: widgetState.width, height: widgetState.height };
     const onMove = (moveEvent) => {
-      widgetState = { ...widgetState, width: clamp(start.width + moveEvent.clientX - start.x, 240, Math.min(420, window.innerWidth - 32)), height: clamp(start.height + moveEvent.clientY - start.y, 280, Math.min(560, window.innerHeight - 32)) };
+      widgetState = { ...widgetState, width: clamp(start.width + moveEvent.clientX - start.x, 232, Math.min(420, window.innerWidth - 32)), height: clamp(start.height + moveEvent.clientY - start.y, 260, Math.min(560, window.innerHeight - 32)) };
       scheduleWidgetFlush(widgetState);
       render();
     };
