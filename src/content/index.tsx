@@ -45,7 +45,7 @@ function App() {
     const first = completions[0];
     if (first) {
       expToast.showExpGain(rewardExp);
-      speechBubble.showMessage('typing', true);
+      speechBubble.showMessage('missionComplete', true);
       console.log('[Typetchi] daily mission completed', { title: first.title, rewardExp });
     }
   }, [addBonusExp, expToast, speechBubble]);
