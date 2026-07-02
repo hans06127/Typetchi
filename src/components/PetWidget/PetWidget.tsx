@@ -97,14 +97,24 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
     </header>
     <div className={styles.body}>
       <SpeechBubble message={speechBubble.message} visible={speechBubble.visible} />
-      <PetCharacter stage={petState.currentStage} animationState={animationState} />
-      <div className={styles.stats}>
-        <div className={styles.row}><strong>Lv. {petState.level}</strong><span>{stage.name}</span></div>
-        <div className={styles.row}><span>EXP</span><span>{stageProgress.isMaxStage ? '最高階段' : `${stageProgress.current} / ${stageProgress.required}`}</span></div>
+      <div className={styles.hero}>
+        <PetCharacter stage={petState.currentStage} animationState={animationState} />
+      </div>
+      <section className={styles.progressCard} aria-label="等級與 EXP">
+        <div className={styles.levelRow}>
+          <strong className={styles.levelText}>Lv. {petState.level}</strong>
+          <span className={styles.stageText}>{stage.name}</span>
+        </div>
+        <div className={styles.expRow}>
+          <span className={styles.label}>EXP</span>
+          <span className={styles.value}>{stageProgress.isMaxStage ? '最高階段' : `${stageProgress.current} / ${stageProgress.required}`}</span>
+        </div>
         <ExpBar value={stageProgress.current} max={stageProgress.required} percentage={stageProgress.percentage} />
-        <TypingStatsPanel todayTypedCount={petState.todayTypedCount} recentCpm={speedState.recentCpm} recentWpm={speedState.recentWpm} todayMaxCpm={speedState.todayMaxCpm} />
+        <div className={styles.nextHint}>下一階段：{nextStage?.name ?? '已成熟'}</div>
+      </section>
+      <div className={styles.sections}>
         <DailyMissionsPanel missionsState={missionsState} />
-        <div className={styles.row}><span className={styles.muted}>下一階段</span><span>{nextStage?.name ?? '已成熟'}</span></div>
+        <TypingStatsPanel todayTypedCount={petState.todayTypedCount} recentCpm={speedState.recentCpm} recentWpm={speedState.recentWpm} todayMaxCpm={speedState.todayMaxCpm} />
       </div>
     </div>
     <SettingsPanel onResetPetProgress={onResetPetProgress} />

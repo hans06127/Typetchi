@@ -1,10 +1,18 @@
-.panel { display: grid; gap: 6px; padding: 8px; border: 1px solid rgba(138,120,110,.16); border-radius: 14px; background: rgba(255,255,255,.45); }
-.heading { font-size: 12px; font-weight: 800; color: #6f5d53; }
-.empty { font-size: 12px; color: #8a786e; }
-.mission { display: grid; gap: 4px; min-width: 0; padding: 7px; border-radius: 12px; background: rgba(255,249,244,.74); }
+.panel { display: grid; gap: 7px; padding: 9px; border: 1px solid rgba(138,120,110,.16); border-radius: 16px; background: rgba(255,255,255,.48); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.heading { font-size: 12px; font-weight: 850; color: #5f4f47; }
+.summary { color: #8a786e; font-size: 11px; font-weight: 700; }
+.completeNote, .empty { padding: 6px 8px; border-radius: 12px; background: rgba(222,248,235,.62); color: #5f6f58; font-size: 11px; font-weight: 750; }
+.empty { background: rgba(255,249,244,.72); color: #8a786e; }
+.mission { display: grid; gap: 5px; min-width: 0; padding: 8px; border-radius: 13px; background: rgba(255,249,244,.78); box-shadow: inset 0 0 0 1px rgba(126,101,88,.08); }
 .completed { background: rgba(222,248,235,.72); }
 .titleRow, .progressRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-.title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
-.reward, .progressRow { flex: 0 0 auto; font-size: 11px; color: #8a786e; }
+.titleWrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.check { flex: 0 0 auto; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 999px; background: rgba(138,120,110,.14); color: #6f5d53; font-size: 11px; font-weight: 900; }
+.completed .check { background: #91d7ae; color: #fff; }
+.title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 780; }
+.reward { flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: rgba(255,232,159,.72); color: #765022; font-size: 11px; font-weight: 850; }
+.progressRow { color: #8a786e; font-size: 11px; font-weight: 700; }
 .track { overflow: hidden; height: 5px; border-radius: 999px; background: rgba(138,120,110,.16); }
 .track > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f6a6b8, #91d7ae); transition: width 160ms ease; }
+@media (prefers-reduced-motion: reduce) { .track > span { transition: none !important; } }

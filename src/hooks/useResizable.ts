@@ -8,8 +8,8 @@ export function useResizable(widget: WidgetState, onChange: (next: WidgetState) 
     if (widget.pinned) return;
     startRef.current = { x: event.clientX, y: event.clientY, width: widget.width, height: widget.height };
     const onMove = (moveEvent: PointerEvent) => {
-      const width = clamp(startRef.current.width + moveEvent.clientX - startRef.current.x, 240, Math.min(420, window.innerWidth - 32));
-      const height = clamp(startRef.current.height + moveEvent.clientY - startRef.current.y, 280, Math.min(560, window.innerHeight - 32));
+      const width = clamp(startRef.current.width + moveEvent.clientX - startRef.current.x, 232, Math.min(420, window.innerWidth - 32));
+      const height = clamp(startRef.current.height + moveEvent.clientY - startRef.current.y, 260, Math.min(560, window.innerHeight - 32));
       onChange({ ...widget, width, height });
     };
     const onUp = () => {
