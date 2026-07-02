@@ -97,18 +97,24 @@ function Stage3Svg() {
   </svg>;
 }
 
+const rendererType = 'svg';
+
 const stageRenderers: Record<PetStageId, () => unknown> = {
   stage_1: Stage1Svg,
   stage_2: Stage2Svg,
   stage_3: Stage3Svg,
 };
 
-export function PetCharacter({ stage, animationState, compact = false }: PetCharacterProps) {
+function SvgPetRenderer({ stage, animationState, compact }: PetCharacterProps) {
   const StageArt = stageRenderers[stage];
 
   return <div className={`${styles.wrap} ${compact ? styles.compact : ''}`}>
-    <div className={[styles.pet, styles[`pet--${stage}`], styles[`pet--${animationState}`]].join(' ')} aria-label="Typetchi 冰藍狐靈" role="img">
+    <div className={[styles.pet, styles[`pet--${stage}`], styles[`pet--${animationState}`]].join(' ')} aria-label="Typetchi 冰藍狐靈" role="img" data-renderer={rendererType}>
       <StageArt />
     </div>
   </div>;
+}
+
+export function PetCharacter(props: PetCharacterProps) {
+  return <SvgPetRenderer {...props} />;
 }
