@@ -6,6 +6,7 @@
   const SETTINGS_KEY = 'typetchi.settings';
   const TYPING_STATS_KEY = 'typetchi.typingStats';
   const DAILY_MISSIONS_KEY = 'typetchi.dailyMissions';
+  const DEV_TOOLS_KEY = 'typetchi.devTools';
   const FLUSH_DELAY_MS = 1000;
   const PET_ANIMATION_DURATION = { typing: 400, happy: 800, level_up: 1200, evolve: 1800 };
   const PET_MESSAGES = { typing: ['字光被我接住了。', '冰尾正在充能，繼續敲吧！', '你的文字有暖暖的聲音。', '我聽見鍵盤像小雪鈴一樣。'], levelUp: ['狐靈升級，尾巴更亮了！', '我長出新的文字靈光了。', '這份努力，我收到了。'], evolve: ['冰藍狐靈進化了！', '新的狐靈姿態登場。', '謝謝你陪我長大。'], missionComplete: ['今日任務完成，狐火獻上獎勵！', '任務星光收集完畢。', '好棒，我們完成一個小約定了。'], paste: ['貼上的文字不會增加經驗值', '只計算手打的文字喔', '手打的字才會變成狐火。'], resetWidget: ['視窗位置已重置'], resetProgress: ['角色進度已重置，狐靈重新出發。'] };
@@ -36,6 +37,7 @@
   let isComposing = false;
   let shadowRoot;
   let appRoot;
+  let devToolsEnabled = window.localStorage.getItem(DEV_TOOLS_KEY) === 'enabled';
   let petState = defaultPetState();
   let widgetState = defaultWidgetState();
   let petFlushTimer;
@@ -325,6 +327,15 @@
     else if (previousLevel < petState.level) showSpeech('levelUp', true);
     else showSpeech(fallbackSpeech, true);
   }
+  function setDevToolsEnabled(enabled) {
+    devToolsEnabled = enabled;
+    if (enabled) window.localStorage.setItem(DEV_TOOLS_KEY, 'enabled');
+    else window.localStorage.removeItem(DEV_TOOLS_KEY);
+    render();
+  }
+  function addDevExp(amount) {
+    applyBonusExp(amount, 'levelUp');
+  }
   function ensureDailyMissionsForToday() {
     const today = dateKey();
     if (dailyMissionsState.dateKey !== today) dailyMissionsState = defaultDailyMissionsState(today);
@@ -451,7 +462,7 @@
       .typetchi-toast { position: absolute; right: 16px; bottom: 92px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: rgba(255,238,170,.96); color: #765022; font-size: 12px; font-weight: 800; opacity: 0; pointer-events: none; transition: opacity 160ms ease, transform 160ms ease; } .typetchi-toast.visible { opacity: 1; animation: typetchi-exp-toast 1s ease-out; }
       .typetchi-pet.idle { animation: typetchi-idle 2.4s ease-in-out infinite; } .typetchi-pet.typing { animation: typetchi-typing .4s ease-in-out; } .typetchi-pet.happy { animation: typetchi-happy .8s ease-in-out; } .typetchi-pet.level_up { animation: typetchi-level-up 1.2s ease-in-out; } .typetchi-pet.evolve { animation: typetchi-evolve 1.8s ease-in-out; }
       .typetchi-stats { display: grid; gap: 7px; font-size: 13px; }
-      .typetchi-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; } .typetchi-row span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; } .typetchi-stats-panel { display: grid; gap: 7px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.46); } .typetchi-footer { flex: 0 0 auto; display: grid; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid rgba(126,101,88,.12); background: rgba(255,249,244,.58); border-radius: 0 0 22px 22px; } .typetchi-footer-label { color: #9a897f; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; } .typetchi-footer .subtle-danger { justify-self: start; padding: 4px 8px; color: #8a5b50; background: transparent; box-shadow: none; text-decoration: underline; text-decoration-color: rgba(138,91,80,.32); text-underline-offset: 3px; }
+      .typetchi-row { display: flex; justify-content: space-between; gap: 12px; min-width: 0; } .typetchi-row span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; } .typetchi-stats-panel { display: grid; gap: 7px; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.46); } .typetchi-footer { flex: 0 0 auto; display: grid; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid rgba(126,101,88,.12); background: rgba(255,249,244,.58); border-radius: 0 0 22px 22px; } .typetchi-footer-label { color: #9a897f; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; } .typetchi-footer .subtle-danger { justify-self: start; padding: 4px 8px; color: #8a5b50; background: transparent; box-shadow: none; text-decoration: underline; text-decoration-color: rgba(138,91,80,.32); text-underline-offset: 3px; } .typetchi-dev-tools { display: grid; gap: 6px; padding-top: 6px; border-top: 1px dashed rgba(126,101,88,.18); } .typetchi-dev-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
       .typetchi-muted { color: #8a786e; }
       .typetchi-bar { height: 10px; background: rgba(95,78,65,.14); border-radius: 999px; overflow: hidden; }
       .typetchi-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ffb7c5, #ffd88a, #9ee7c6); transition: width 220ms ease; }
@@ -640,6 +651,23 @@
     const resetPetButton = createButton('重置角色進度', resetPetProgress);
     resetPetButton.className = 'subtle-danger';
     footer.append(footerLabel, resetPetButton);
+    if (devToolsEnabled) {
+      const devWrap = document.createElement('div');
+      devWrap.className = 'typetchi-dev-tools';
+      const devLabel = document.createElement('div');
+      devLabel.className = 'typetchi-footer-label';
+      devLabel.textContent = 'Dev only';
+      const devButtons = document.createElement('div');
+      devButtons.className = 'typetchi-dev-buttons';
+      devButtons.append(
+        createButton('+100 EXP', () => addDevExp(100)),
+        createButton('Stage 2', () => addDevExp(500)),
+        createButton('Stage 3', () => addDevExp(2000)),
+        createButton('關閉 Dev', () => setDevToolsEnabled(false)),
+      );
+      devWrap.append(devLabel, devButtons);
+      footer.append(devWrap);
+    }
     const resize = document.createElement('span');
     resize.className = 'typetchi-resize';
     header.addEventListener('pointerdown', startDrag);
@@ -778,6 +806,10 @@
     document.addEventListener('input', handleInput, true);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAllStorage(); });
     window.addEventListener('beforeunload', flushAllStorage);
+    window.addEventListener('keydown', (event) => {
+      if (!event.altKey || !event.shiftKey || event.code !== 'KeyT') return;
+      setDevToolsEnabled(!devToolsEnabled);
+    });
   }
   function loadStorageAndRender() {
     Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState()), storageGet(DAILY_MISSIONS_KEY, defaultDailyMissionsState())]).then(([storedPet, storedWidget, storedMissions]) => {

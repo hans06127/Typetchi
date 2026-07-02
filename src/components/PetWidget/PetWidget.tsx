@@ -28,10 +28,13 @@ interface PetWidgetProps {
   speedState: TypingSpeedState;
   missionsState: DailyMissionsState | null;
   onResetPetProgress: () => void;
+  devToolsEnabled?: boolean;
+  onDevAddExp?: (amount: number) => void;
+  onDisableDevTools?: () => void;
   onWidgetStateReady?: (handler: (nextState: WidgetState) => void) => void;
 }
 
-export function PetWidget({ petState, animationState, expToast, speechBubble, speedState, missionsState, onResetPetProgress, onWidgetStateReady }: PetWidgetProps) {
+export function PetWidget({ petState, animationState, expToast, speechBubble, speedState, missionsState, onResetPetProgress, devToolsEnabled = false, onDevAddExp, onDisableDevTools, onWidgetStateReady }: PetWidgetProps) {
   const [widget, setWidget] = useState<WidgetState>(createDefaultWidgetState);
   const { scheduleFlush: scheduleWidgetFlush } = useDebouncedStorageFlush<WidgetState>(saveWidgetState, 1000);
   useEffect(() => { void loadWidgetState().then((state) => { console.log('[Typetchi] storage loaded'); setWidget(state); }); }, []);
@@ -107,7 +110,7 @@ export function PetWidget({ petState, animationState, expToast, speechBubble, sp
         <div className={styles.row}><span className={styles.muted}>下一階段</span><span>{nextStage?.name ?? '已成熟'}</span></div>
       </div>
     </div>
-    <SettingsPanel onResetPetProgress={onResetPetProgress} />
+    <SettingsPanel onResetPetProgress={onResetPetProgress} devToolsEnabled={devToolsEnabled} onDevAddExp={onDevAddExp} onDisableDevTools={onDisableDevTools} />
     <ExpGainToast amount={expToast.amount} visible={expToast.visible} />
     <span className={styles.resize} onPointerDown={resize} />
   </section>;

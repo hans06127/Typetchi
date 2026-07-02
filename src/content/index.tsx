@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PetWidget } from '../components/PetWidget/PetWidget';
 import { TYPING_SESSION_IDLE_TIMEOUT } from '../systems/typingStatsSystem';
@@ -19,7 +19,10 @@ let isMounting = false;
 let ensureRootTimer: number | undefined;
 let rootRemovalObserver: MutationObserver | undefined;
 
+const DEV_TOOLS_KEY = 'typetchi.devTools';
+
 function App() {
+  const [devToolsEnabled, setDevToolsEnabled] = useState(() => window.localStorage.getItem(DEV_TOOLS_KEY) === 'enabled');
   const animation = usePetAnimation();
   const expToast = useExpGainToast();
   const speechBubble = useSpeechBubble();
@@ -67,6 +70,27 @@ function App() {
     recordMissionProgress({ addedChars: input.addedChars, todayTypedCount: petState.todayTypedCount + input.addedChars, todayMaxCpm: Math.max(speedState.todayMaxCpm, speedState.recentCpm + input.addedChars), todaySessionCount: nextSessionCount, timestamp: input.timestamp });
   }, [addTypingExp, petState.todayTypedCount, recordMissionProgress, recordTyping, speedState.recentCpm, speedState.todayMaxCpm]);
   useTypingTracker(handleValidTyping, pasteDetection.showPasteHint);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey || !event.shiftKey || event.code !== 'KeyT') return;
+      setDevToolsEnabled((enabled) => {
+        const next = !enabled;
+        if (next) window.localStorage.setItem(DEV_TOOLS_KEY, 'enabled');
+        else window.localStorage.removeItem(DEV_TOOLS_KEY);
+        return next;
+      });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+  const disableDevTools = useCallback(() => {
+    window.localStorage.removeItem(DEV_TOOLS_KEY);
+    setDevToolsEnabled(false);
+  }, []);
+  const handleDevAddExp = useCallback((amount: number) => {
+    addBonusExp(amount);
+    speechBubble.showMessage('levelUp', true);
+  }, [addBonusExp, speechBubble]);
   const handleResetPetProgress = useCallback(async () => {
     const confirmed = window.confirm('確定要重置角色進度嗎？EXP、等級與今日統計會歸零。');
     if (!confirmed) return;
@@ -76,7 +100,7 @@ function App() {
     speechBubble.showMessage('resetProgress', true);
   }, [resetProgress, resetTypingStats, speechBubble]);
 
-  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} missionsState={missionsState} onResetPetProgress={handleResetPetProgress} onWidgetStateReady={registerWidgetSync} />;
+  return <PetWidget petState={petState} animationState={animation.animationState} expToast={expToast} speechBubble={speechBubble} speedState={speedState} missionsState={missionsState} onResetPetProgress={handleResetPetProgress} devToolsEnabled={devToolsEnabled} onDevAddExp={handleDevAddExp} onDisableDevTools={disableDevTools} onWidgetStateReady={registerWidgetSync} />;
 }
 
 function ensureTypetchiRoot() {
