@@ -1,3 +1,5 @@
+import { wasLongKeyHoldRepeat } from './keyHoldExclusionSystem';
+
 export const PASTE_DETECTION_WINDOW_MS = 1000;
 export const MAX_CHARS_PER_INPUT_EVENT = 20;
 
@@ -22,5 +24,6 @@ export function shouldIgnoreInputForExp(params: {
   if (params.isComposing) return true;
   if (params.addedChars <= 0) return true;
   if (params.addedChars > MAX_CHARS_PER_INPUT_EVENT) return true;
+  if (wasLongKeyHoldRepeat(params.element, params.now)) return true;
   return wasRecentlyPasted(params.element, params.now);
 }

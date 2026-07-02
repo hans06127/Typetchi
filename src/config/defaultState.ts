@@ -24,3 +24,6 @@ export const defaultWidgetState = (): WidgetState => ({
 
 export const createDefaultPetState = defaultPetState;
 export const createDefaultWidgetState = defaultWidgetState;
+
+export const CURRENT_STORAGE_SCHEMA_VERSION = 1;
+export const defaultStorageSchemaVersion = () => CURRENT_STORAGE_SCHEMA_VERSION;
