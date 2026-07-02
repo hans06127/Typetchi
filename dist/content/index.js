@@ -1,4 +1,5 @@
 (() => {
+  const RUNTIME_VERSION = '0.9.0';
   const ROOT_ID = 'typetchi-root';
   const APP_ID = 'typetchi-app';
   const PET_KEY = 'typetchi.petState';
@@ -6,6 +7,8 @@
   const SETTINGS_KEY = 'typetchi.settings';
   const TYPING_STATS_KEY = 'typetchi.typingStats';
   const DAILY_MISSIONS_KEY = 'typetchi.dailyMissions';
+  const SCHEMA_VERSION_KEY = 'typetchi.schemaVersion';
+  const CURRENT_STORAGE_SCHEMA_VERSION = 1;
   const FLUSH_DELAY_MS = 1000;
   const PET_ANIMATION_DURATION = { typing: 400, happy: 800, level_up: 1200, evolve: 1800 };
   const PET_MESSAGES = { typing: ['正在吸收文字能量...', '今天也很努力呢', '繼續打字，我會長大！'], levelUp: ['升級了！', '變得更有精神了！'], evolve: ['進化了！', '新的樣子登場！'], paste: ['貼上的文字不會增加經驗值', '只計算手打的文字喔'], resetWidget: ['視窗位置已重置'], resetProgress: ['角色進度已重置'] };
@@ -13,6 +16,7 @@
   const PASTE_HINT_COOLDOWN_MS = 30000;
   const PASTE_DETECTION_WINDOW_MS = 1000;
   const MAX_CHARS_PER_INPUT_EVENT = 20;
+  const LONG_KEY_HOLD_THRESHOLD_MS = 1500;
   const TYPING_SESSION_IDLE_TIMEOUT = 10000;
   const TYPING_EVENT_RETENTION_MS = 120000;
   const TYPING_SPEED_WINDOW_MS = 60000;
@@ -29,10 +33,12 @@
   ];
   const STAGES = EVOLUTION_NODES.map(({ id, name, requiredExp, icon }) => ({ id, name, requiredExp, icon }));
 
-  console.log('[Typetchi] content script loaded');
+  console.log('[Typetchi] Typetchi runtime v0.9.0 content script loaded');
 
   const previousLengthMap = new WeakMap();
   const pasteElementMap = new WeakMap();
+  const keyHoldMap = new WeakMap();
+  const invalidRepeatMap = new WeakMap();
   let isComposing = false;
   let shadowRoot;
   let appRoot;
@@ -305,10 +311,24 @@
   }
   function markPaste(element, pastedAt) { pasteElementMap.set(element, pastedAt); }
   function wasRecentlyPasted(element, now) { const pastedAt = pasteElementMap.get(element); return Boolean(pastedAt && now - pastedAt <= PASTE_DETECTION_WINDOW_MS); }
+  function keyId(event) { return (event.code || 'unknown') + ':' + (event.key || 'unknown'); }
+  function trackKeyDown(event) {
+    if (!(event.target instanceof HTMLElement) || event.isComposing) return;
+    let elementMap = keyHoldMap.get(event.target);
+    if (!elementMap) { elementMap = new Map(); keyHoldMap.set(event.target, elementMap); }
+    const id = keyId(event);
+    const now = Date.now();
+    const existing = elementMap.get(id);
+    if (!event.repeat || !existing) { elementMap.set(id, { startedAt: now }); return; }
+    if (now - existing.startedAt > LONG_KEY_HOLD_THRESHOLD_MS) invalidRepeatMap.set(event.target, now);
+  }
+  function trackKeyUp(event) { if (event.target instanceof HTMLElement) keyHoldMap.get(event.target)?.delete(keyId(event)); }
+  function wasLongKeyHoldRepeat(element, now) { const invalidAt = invalidRepeatMap.get(element); return Boolean(invalidAt && now - invalidAt <= 250); }
   function shouldIgnoreInputForExp(element, addedChars, now) {
     if (isComposing) return true;
     if (addedChars <= 0) return true;
     if (addedChars > MAX_CHARS_PER_INPUT_EVENT) return true;
+    if (wasLongKeyHoldRepeat(element, now)) return true;
     return wasRecentlyPasted(element, now);
   }
   function pruneTypingEvents(events, now) { const threshold = now - TYPING_EVENT_RETENTION_MS; return events.filter((event) => event.timestamp >= threshold); }
@@ -778,6 +798,8 @@
     });
   }
   function attachGlobalListeners() {
+    document.addEventListener('keydown', trackKeyDown, true);
+    document.addEventListener('keyup', trackKeyUp, true);
     document.addEventListener('compositionstart', () => { isComposing = true; }, true);
     document.addEventListener('compositionend', () => { isComposing = false; }, true);
     document.addEventListener('paste', handlePaste, true);
@@ -786,12 +808,13 @@
     window.addEventListener('beforeunload', flushAllStorage);
   }
   function loadStorageAndRender() {
-    Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState()), storageGet(DAILY_MISSIONS_KEY, defaultDailyMissionsState())]).then(([storedPet, storedWidget, storedMissions]) => {
+    Promise.all([storageGet(PET_KEY, defaultPetState()), storageGet(WIDGET_KEY, defaultWidgetState()), storageGet(DAILY_MISSIONS_KEY, defaultDailyMissionsState()), storageGet(SCHEMA_VERSION_KEY, CURRENT_STORAGE_SCHEMA_VERSION)]).then(([storedPet, storedWidget, storedMissions, storedSchemaVersion]) => {
       const today = dateKey();
       petState = { ...storedPet, level: calculateLevel(storedPet.totalExp), currentStage: calculateStage(storedPet.totalExp, { todayMaxCpm: storedPet.todayMaxCpm }), todayTypedCount: storedPet.lastActiveDate === today ? storedPet.todayTypedCount : 0, todayMaxCpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxCpm ?? 0) : 0, todayMaxWpm: storedPet.lastActiveDate === today ? (storedPet.todayMaxWpm ?? 0) : 0, lastActiveDate: today };
       typingSpeedState = { ...typingSpeedState, todayMaxCpm: petState.todayMaxCpm, todayMaxWpm: petState.todayMaxWpm };
       widgetState = normalizeWidgetState(storedWidget);
       dailyMissionsState = storedMissions.dateKey === today ? storedMissions : defaultDailyMissionsState(today);
+      if (storedSchemaVersion !== CURRENT_STORAGE_SCHEMA_VERSION) storageSet(SCHEMA_VERSION_KEY, CURRENT_STORAGE_SCHEMA_VERSION);
       if (storedMissions.dateKey !== today) scheduleDailyMissionsFlush(dailyMissionsState);
       console.log('[Typetchi] storage loaded');
       render();
@@ -833,7 +856,7 @@
     return observer;
   }
   function startTypetchi() {
-    console.log('[Typetchi] content script loaded');
+    console.log('[Typetchi] Typetchi runtime v0.9.0 content script loaded');
     ensureTypetchiRoot();
     observeRootRemoval();
     attachGlobalListeners();

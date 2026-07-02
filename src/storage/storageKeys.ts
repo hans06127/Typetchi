@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   SETTINGS: 'typetchi.settings',
   TYPING_STATS: 'typetchi.typingStats',
   DAILY_MISSIONS: 'typetchi.dailyMissions',
+  SCHEMA_VERSION: 'typetchi.schemaVersion',
 
   // Backward-compatible aliases for existing code paths.
   pet: 'typetchi.petState',
